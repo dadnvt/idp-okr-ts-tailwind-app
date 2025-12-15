@@ -7,6 +7,7 @@ import Sidebar from '../Sidebar';
 import StatsCard from '../StatsCard';
 import { useAuth } from '../../common/AuthContext';
 import LeaderGoalCard from './LeaderGoalCard';
+import { fetchLeaderGoals, reviewLeaderGoal } from '../../api/leaderApi';
 
 export default function LeaderDashboard() {
   const { auth } = useAuth();
@@ -17,12 +18,7 @@ export default function LeaderDashboard() {
 
   useEffect(() => {
     const fetchGoals = async () => {
-      const res = await fetch('http://localhost:3000/leader/goals', {
-        headers: {
-          Authorization: `Bearer ${auth.token}`,
-        },
-      });
-      const result = await res.json();
+      const { result } = await fetchLeaderGoals(auth.token);
       setGoals(result.data);
     };
     fetchGoals();
@@ -86,17 +82,7 @@ export default function LeaderDashboard() {
             goal={reviewGoal}
             onClose={() => setReviewGoal(null)}
             onSubmit={async (review) => {
-              await fetch(
-                `http://localhost:3000/leader/goals/${reviewGoal.id}/review`,
-                {
-                  method: 'POST',
-                  headers: {
-                    Authorization: `Bearer ${auth.token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify(review),
-                }
-              );
+              await reviewLeaderGoal(auth.token, reviewGoal.id, review);
 
               setGoals(prev =>
                 prev.map(g =>

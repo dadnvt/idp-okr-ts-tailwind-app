@@ -5,19 +5,9 @@ import './index.css'
 import App from './App.tsx'
 
 import { Amplify } from 'aws-amplify';
+import amplifyConfig from './aws-exports.js';
 
-Amplify.configure({
-  Auth: {
-    Cognito: {
-      userPoolId: 'us-east-1_ilPTEVT0U',
-      userPoolClientId: '1c50sakb0hn0k5grcgr4atbe8n',
-      signUpVerificationMethod: 'code',
-      loginWith: {
-        email: true,
-      },
-    },
-  },
-});
+Amplify.configure(amplifyConfig);
 
 
 createRoot(document.getElementById('root')!).render(

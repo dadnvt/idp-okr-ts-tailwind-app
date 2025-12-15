@@ -7,18 +7,22 @@ import Dropdown from './Dropdown';
 import Sidebar from './Sidebar';
 import Modal from '../common/Modal';
 import { useAuth } from '../common/AuthContext';
-import { DateInput } from './DateInput';
-import { Input } from './Input';
-import { Textarea } from './Textarea';
-import { NumberInput } from './NumberInput';
-import { getQuarter, getQuarterEnd, getHalfYearRollingEnd } from '../common/Utility';
+import { YEAR_OPTIONS } from '../common/constants';
+import { GoalCreateFormFields } from './goals/GoalCreateFormFields';
+import { useGoalDraft } from './goals/useGoalDraft';
+import {
+  createGoal,
+  deleteGoal as apiDeleteGoal,
+  fetchGoals as apiFetchGoals,
+  updateGoal as apiUpdateGoal,
+} from '../api/goalsApi';
 
 export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goal: IGoal) => void }) {
   const { auth } = useAuth();
-  const years = Array.from({ length: 6 }, (_, i) => 2025 + i);
+  const years = YEAR_OPTIONS;
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedGoal, setSelectedGoal] = useState<any | null>(null);
+  const [selectedGoal, setSelectedGoal] = useState<IGoal | null>(null);
   const [goals, setGoals] = useState<IGoal[]>([]);
   const [deleteGoal, setDeleteGoal] = useState<IGoal | null>(null);
   const [editGoal, setEditGoal] = useState<IGoal | null>(null);
@@ -30,43 +34,20 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
   const totalGoals = filteredGoals.length;
   const avgProgress = totalGoals > 0 ? filteredGoals.reduce((sum, g) => sum + g.progress, 0) / totalGoals : 0;
 
-  const [name, setTitle] = useState('');
-  const [skill, setSkill] = useState('');
-  const [time_bound, setDeadline] = useState('');
-  const [type, setType] = useState('Soft');
-  const [durationType, setDurationType] = useState('Quarter');
-  const [progress, setProgress] = useState(0);
-  const [specific, setSpecific] = useState('');
-  const [measurable, setMeasurable] = useState('');
-  const [achievable, setAchievable] = useState('');
-  const [relevant, setRelevant] = useState('');
-  const [start_date, setStartDate] = useState('');
-  const [success_metric, setSuccessMetric] = useState('');
-  const [status, setStatus] = useState('Not started');
-  const [weight, setWeight] = useState(0);
-  const [risk, setRisk] = useState('');
-  const [dependencies, setDependencies] = useState('');
-  const [notes, setNotes] = useState('');
+  const { draft, setField, onDurationTypeChange, onStartDateChange, reset } = useGoalDraft();
 
   useEffect(() => {
-    const fetchGoals = async () => {
+    const loadGoals = async () => {
       try {
         const token = auth.token;
-        const res = await fetch(`http://localhost:3000/goals`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          }
-        });
-
-        const result = await res.json();
+        const { result } = await apiFetchGoals(token);
         setGoals(result.data);
       } catch (err) {
         console.error('Error fetching goals:', err);
       }
     };
 
-    fetchGoals();
+    loadGoals();
   }, []);
 
   async function handleCreateGoal(e: React.FormEvent) {
@@ -79,39 +60,31 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
         user_id: userId,
         user_email: auth.user?.email,
         year: new Date().getFullYear(),
-        name,
-        type,
-        duration_type: durationType,
-        skill,
-        specific,
-        measurable,
-        achievable,
-        relevant,
-        start_date,
-        time_bound,
-        success_metric,
-        status,
-        weight,
-        progress,
-        risk,
-        dependencies,
-        notes,
+        name: draft.name,
+        type: draft.type,
+        duration_type: draft.durationType,
+        skill: draft.skill,
+        specific: draft.specific,
+        measurable: draft.measurable,
+        achievable: draft.achievable,
+        relevant: draft.relevant,
+        start_date: draft.start_date,
+        time_bound: draft.time_bound,
+        success_metric: draft.success_metric,
+        status: draft.status,
+        weight: draft.weight,
+        progress: draft.progress,
+        risk: draft.risk,
+        dependencies: draft.dependencies,
+        notes: draft.notes,
         is_locked: false
       };
 
-      const res = await fetch('http://localhost:3000/goals', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newGoal)
-      });
-
-      const result = await res.json();
+      const { result } = await createGoal(token, newGoal);
 
       setShowCreateModal(false);
       setGoals((prev) => [...prev, result.data]);
+      reset();
     } catch (err) {
       console.error('Error creating goal:', err);
     }
@@ -120,12 +93,8 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
   async function handleDeleteGoal(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:3000/goals/${deleteGoal?.id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${auth.token}`,
-        },
-      });
+      if (!deleteGoal?.id) return;
+      const { res } = await apiDeleteGoal(auth.token, deleteGoal.id);
 
       if (res.ok) {
         setGoals(prev => prev.filter(g => g.id !== deleteGoal?.id));
@@ -139,16 +108,8 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
   async function handleUpdateGoal(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:3000/goals/${editGoal?.id}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${auth.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editGoal),
-      });
-
-      const result = await res.json();
+      if (!editGoal?.id) return;
+      const { result } = await apiUpdateGoal(auth.token, editGoal.id, editGoal);
       setGoals(prev => prev.map(g => g.id === result.data.id ? result.data : g));
       setEditGoal(null);
     } catch (err) {
@@ -240,76 +201,12 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
             onClose={() => setShowCreateModal(false)}
           >
             <form className="space-y-4" onSubmit={handleCreateGoal}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Cột trái: SMART */}
-                <div className="space-y-4">
-                  <Input label="Goal Title" value={name} onChange={setTitle} />
-                  <Input label="Skill" value={skill} onChange={setSkill} />
-                  <div className='flex gap-2'>
-                    <Dropdown label="Goal type" value={type} options={['Soft', 'Hard']} onChange={setType} />
-                    <Dropdown
-                      label="Goal Duration"
-                      value={durationType}
-                      options={['Quarter', 'HalfYear']}
-                      onChange={(val) => {
-                        setDurationType(val);
-
-                        if (!start_date) return;
-
-                        const start = new Date(start_date);
-
-                        if (val === 'Quarter') {
-                          const quarter = getQuarter(start.getMonth() + 1);
-                          const quarterEnd = getQuarterEnd(start.getFullYear(), quarter);
-                          setDeadline(quarterEnd.toISOString().split("T")[0]);
-                        }
-
-                        if (val === 'HalfYear') {
-                          const halfYearEnd = getHalfYearRollingEnd(start);
-                          setDeadline(halfYearEnd.toISOString().split("T")[0]);
-                        }
-                      }}
-                    />
-                  </div>
-                  <Input label="Specific" value={specific} onChange={setSpecific} />
-                  <Input label="Measurable" value={measurable} onChange={setMeasurable} />
-                  <Input label="Achievable" value={achievable} onChange={setAchievable} />
-                  <Input label="Relevant" value={relevant} onChange={setRelevant} />
-                </div>
-
-                {/* Cột phải: thời gian & tiến độ */}
-                <div className="space-y-4">
-                  <DateInput
-                    label="Start Date"
-                    value={start_date}
-                    onChange={(val) => {
-                      setStartDate(val);
-                      const start = new Date(val);
-
-                      if (durationType === 'Quarter') {
-                        const quarter = getQuarter(start.getMonth() + 1);
-                        const quarterEnd = getQuarterEnd(start.getFullYear(), quarter);
-                        setDeadline(quarterEnd.toISOString().split("T")[0]);
-                      }
-
-                      if (durationType === 'HalfYear') {
-                        const end = new Date(start);
-                        end.setMonth(end.getMonth() + 6);
-                        end.setDate(end.getDate() - 1);
-                        setDeadline(end.toISOString().split("T")[0]);
-                      }
-                    }}
-                  />
-                  <DateInput label="Deadline" disabled={true} value={time_bound} onChange={setDeadline} />
-                  <Input label="Success Metric" value={success_metric} onChange={setSuccessMetric} />
-                  <Dropdown label="Status" value={status} options={['Draft', 'In Progress', 'Completed', 'Cancelled', 'Not started']} onChange={setStatus} />
-                  <NumberInput label="Progress (%)" value={progress} onChange={setProgress} />
-                  <NumberInput label="Weight (%)" value={weight} onChange={setWeight} />
-                  <Input label="Risk" value={risk} onChange={setRisk} />
-                  <Input label="Dependencies" value={dependencies} onChange={setDependencies} />
-                  <Textarea label="Notes" value={notes} onChange={setNotes} />
-                </div>
-              </div>
+              <GoalCreateFormFields
+                draft={draft}
+                onFieldChange={setField}
+                onStartDateChange={onStartDateChange}
+                onDurationTypeChange={onDurationTypeChange}
+              />
               <div className="flex justify-end mt-6 space-x-4">
                 <button
                   type="submit"

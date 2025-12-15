@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import Modal from '../common/Modal';
 import type { IActionPlan, IGoal } from '../types';
@@ -7,26 +7,23 @@ import { CreateActionPlanForm } from '../components/CreateActionPlanForm';
 import Dropdown from '../components/Dropdown';
 import { useAuth } from '../common/AuthContext';
 import { getGoalHealth } from '../common/Utility';
+import { YEAR_OPTIONS } from '../common/constants';
+import { createActionPlan, fetchActionPlansByYear } from '../api/actionPlansApi';
 
 export default function ActionPlansPage() {
   const { auth } = useAuth();
-  const years = Array.from({ length: 6 }, (_, i) => 2025 + i);
+  const years = YEAR_OPTIONS;
   const [goals, setGoals] = useState<IGoal[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<IActionPlan | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedGoal, setSelectedGoal] = useState<IGoal | null>(null);
+  const lastFetchKeyRef = useRef<string | null>(null);
 
   const fetchGoals = async () => {
     try {
       const token = auth.token;
-      const res = await fetch(`http://localhost:3000/action-plans?year=${selectedYear}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const result = await res.json();
+      if (!token) return;
+      const { result } = await fetchActionPlansByYear(token, selectedYear);
       setGoals(result.data);
     } catch (err) {
       console.error('Error fetching goals:', err);
@@ -34,21 +31,21 @@ export default function ActionPlansPage() {
   };
 
   useEffect(() => {
+    if (!auth.token) return;
+
+    // In React StrictMode (dev), effects can run twice on mount to surface side-effects.
+    // Dedupe identical fetches for the same (token, year) key.
+    const key = `${auth.token}:${selectedYear}`;
+    if (lastFetchKeyRef.current === key) return;
+    lastFetchKeyRef.current = key;
+
     fetchGoals();
   }, [auth.token, selectedYear]);
 
   const handleCreateActionPlan = async (payload: IActionPlan) => {
     try {
-      const res = await fetch(`http://localhost:3000/goals/${selectedGoal?.id}/action-plans`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${auth.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await res.json();
+      if (!selectedGoal?.id) return;
+      const { res, result } = await createActionPlan(auth.token, selectedGoal.id, payload);
       if (!res.ok) throw new Error(result.error || 'Create action plan failed');
 
       setGoals(prev =>
