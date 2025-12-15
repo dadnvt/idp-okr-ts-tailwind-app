@@ -1,4 +1,4 @@
-import type { IGoal } from "../types";
+import type { IActionPlan, IGoal } from "../types";
 
 export function getQuarter(month: number): number {
   if (month >= 1 && month <= 3) return 1;   // Q1: Jan–Mar
@@ -69,4 +69,69 @@ export function getGoalHealth(goal: IGoal): "On Track" | "At Risk" | "High Risk"
     return "At Risk";
   }
   return "On Track";
+}
+
+export function getActionPlanHealth(plan: IActionPlan): "On Track" | "At Risk" | "High Risk" {
+  const now = new Date();
+  const start = new Date(plan.start_date);
+  const end = new Date(plan.end_date);
+
+  // Hard signals first
+  if (plan.status === 'Completed') return 'On Track';
+  if (end.getTime() < now.getTime()) return 'High Risk';
+
+  const totalDuration = end.getTime() - start.getTime();
+  const elapsed = now.getTime() - start.getTime();
+  const expectedProgress =
+    totalDuration > 0 ? Math.min(100, Math.round((elapsed / totalDuration) * 100)) : 0;
+
+  // Heuristic progress based on status (since action_plans has no numeric progress)
+  const statusProgress =
+    plan.status === 'In Progress' ? 50 : plan.status === 'Blocked' ? 20 : 0; // Not Started -> 0
+
+  // Optional signal: stale weekly report (no update recently)
+  const lastReportDate = (plan.weekly_reports || [])
+    .map((r) => r.date)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+
+  const daysSinceLastReport =
+    lastReportDate ? Math.floor((now.getTime() - new Date(lastReportDate).getTime()) / (24 * 3600 * 1000)) : null;
+
+  const stalePenalty = daysSinceLastReport != null && daysSinceLastReport > 14 && expectedProgress > 20 ? 10 : 0;
+  const effectiveProgress = Math.max(0, statusProgress - stalePenalty);
+
+  if (effectiveProgress < expectedProgress - 20) return 'High Risk';
+  if (effectiveProgress < expectedProgress - 10) return 'At Risk';
+  return 'On Track';
+}
+
+export function startOfWeekMonday(d: Date): Date {
+  const date = new Date(d);
+  // JS: 0=Sun ... 6=Sat. We want Monday=0.
+  const day = (date.getDay() + 6) % 7;
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - day);
+  return date;
+}
+
+export function endOfWeekMonday(d: Date): Date {
+  const start = startOfWeekMonday(d);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+export function toDateOnly(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+export function parseDateOnly(dateStr: string): Date {
+  // dateStr: YYYY-MM-DD
+  const [y, m, dd] = dateStr.split('-').map(Number);
+  const d = new Date(y, (m || 1) - 1, dd || 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }

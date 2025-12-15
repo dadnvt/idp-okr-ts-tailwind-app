@@ -1,15 +1,23 @@
 import { FaArrowRight, FaEdit, FaTrash } from 'react-icons/fa';
 import type { IActionPlan, IGoal } from '../types';
 import { getGoalHealth, getHalfYearLabel, getQuarterFromDate } from '../common/Utility';
+import { Button } from './Button';
 
 interface GoalCardProps {
   goal: IGoal;
   onDetailClick: (goal: IGoal) => void;
   onDeleteClick: (goal: IGoal) => void;
   onUpdateClick: (goal: IGoal) => void;
+  showActions?: boolean;
 }
 
-export default function GoalCard({ goal, onDetailClick, onDeleteClick, onUpdateClick }: GoalCardProps) {
+export default function GoalCard({
+  goal,
+  onDetailClick,
+  onDeleteClick,
+  onUpdateClick,
+  showActions = true,
+}: GoalCardProps) {
   const progressColor = goal.progress === 100 ? 'bg-green-500' : (goal.progress > 0 ? 'bg-brand' : 'bg-gray-300');
   const typeBg = goal.type === 'Hard' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800';
   const lateBg = new Date(goal.time_bound) < new Date() ? 'bg-red-100 text-red-800 font-bold' : '';
@@ -53,13 +61,20 @@ export default function GoalCard({ goal, onDetailClick, onDeleteClick, onUpdateC
 
       {goal.is_locked && (
         <div className="flex items-center text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-300 px-3 py-1 rounded-full w-fit mb-3">
-          Leader complete Review
+          {goal.review_status === 'Pending'
+            ? 'Review requested (locked)'
+            : goal.review_status === 'Approved'
+              ? 'Approved (locked)'
+              : 'Locked'}
         </div>
       )}
 
       <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
         Progress: {goal.progress}% <br />
-        Status: {goal.status}
+        Goal Status: {goal.status} <br />
+      </p>
+      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        Review Status: {goal.review_status}
       </p>
       <p className="text-sm font-medium mb-2">
         Health:
@@ -75,31 +90,37 @@ export default function GoalCard({ goal, onDetailClick, onDeleteClick, onUpdateC
       </div>
 
       <div className='flex justify-between gap-2'>
-        <button
+        <Button
           onClick={() => onDetailClick(goal)}
-          className="flex items-center text-brand font-semibold hover:text-brand-dark transition duration-300 mt-2"
+          variant="ghost"
+          size="sm"
+          className="flex items-center text-brand hover:text-brand-dark mt-2"
         >
           View details
           <FaArrowRight className="ml-2 w-3 h-3 group-hover:translate-x-1 transition duration-200" />
-        </button>
+        </Button>
 
         <div className='flex gap-1'>
-          {!goal.is_locked && goal.status === 'Not started' && (
-            <button
+          {showActions && !goal.is_locked && goal.status === 'Not started' && (
+            <Button
               onClick={() => onDeleteClick(goal)}
-              className="flex items-end text-brand font-semibold hover:text-brand-dark transition duration-300 mt-2"
+              variant="ghost"
+              size="sm"
+              className="flex items-end text-brand hover:text-brand-dark mt-2"
             >
               <FaTrash className="ml-2 w-3 h-3 group-hover:translate-x-1 transition duration-200" />
-            </button>
+            </Button>
           )}
 
-          {!goal.is_locked && goal.status === 'Not started' && (
-            <button
+          {showActions && !goal.is_locked && goal.status === 'Not started' && (
+            <Button
               onClick={() => onUpdateClick(goal)}
-              className="flex items-end text-brand font-semibold hover:text-brand-dark transition duration-300 mt-2"
+              variant="ghost"
+              size="sm"
+              className="flex items-end text-brand hover:text-brand-dark mt-2"
             >
               <FaEdit className="ml-2 w-3 h-3 group-hover:translate-x-1 transition duration-200" />
-            </button>
+            </Button>
           )}
         </div>
       </div>

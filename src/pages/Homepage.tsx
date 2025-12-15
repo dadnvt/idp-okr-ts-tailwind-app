@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../common/AuthContext';
 import { signUp, confirmSignUp } from '@aws-amplify/auth';
 import illustration from '../assets/illustration.svg';
+import { Button } from '../components/Button';
 
 export default function Homepage() {
   const { login } = useAuth();
@@ -85,18 +86,12 @@ export default function Homepage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand focus:outline-none"
                 />
-                <button
-                  onClick={handleLogin}
-                  className="w-full bg-brand text-white py-2 rounded-lg hover:bg-brand-dark transition"
-                >
+                <Button onClick={handleLogin} fullWidth variant="primary">
                   Login Now
-                </button>
-                <button
-                  onClick={() => setMode('signup')}
-                  className="w-full border border-gray-300 py-2 rounded-lg hover:bg-gray-100 transition"
-                >
+                </Button>
+                <Button onClick={() => setMode('signup')} fullWidth variant="secondary">
                   Create Account
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -119,18 +114,12 @@ export default function Homepage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand focus:outline-none"
                 />
-                <button
-                  onClick={handleSignUp}
-                  className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition"
-                >
+                <Button onClick={handleSignUp} fullWidth variant="success">
                   Register
-                </button>
-                <button
-                  onClick={() => setMode('login')}
-                  className="w-full border border-gray-300 py-2 rounded-lg hover:bg-gray-100 transition"
-                >
+                </Button>
+                <Button onClick={() => setMode('login')} fullWidth variant="secondary">
                   Back to Login
-                </button>
+                </Button>
               </div>
             </>
           )}
@@ -149,12 +138,9 @@ export default function Homepage() {
                   onChange={(e) => setCode(e.target.value)}
                   className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand focus:outline-none"
                 />
-                <button
-                  onClick={handleConfirm}
-                  className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
-                >
+                <Button onClick={handleConfirm} fullWidth variant="primary">
                   Confirm
-                </button>
+                </Button>
               </div>
             </>
           )}

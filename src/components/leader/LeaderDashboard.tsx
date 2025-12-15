@@ -8,12 +8,20 @@ import StatsCard from '../StatsCard';
 import { useAuth } from '../../common/AuthContext';
 import LeaderGoalCard from './LeaderGoalCard';
 import { fetchLeaderGoals, reviewLeaderGoal } from '../../api/leaderApi';
+import Dropdown from '../Dropdown';
+import { endOfWeekMonday, parseDateOnly, startOfWeekMonday, toDateOnly } from '../../common/Utility';
+import { Button } from '../Button';
 
 export default function LeaderDashboard() {
   const { auth } = useAuth();
   const [goals, setGoals] = useState<IGoal[]>([]);
   const [selectedGoal, setSelectedGoal] = useState<IGoal | null>(null);
   const [reviewGoal, setReviewGoal] = useState<IGoal | null>(null);
+  const [goalStatusFilter, setGoalStatusFilter] = useState<string>('All');
+  const [reviewStatusFilter, setReviewStatusFilter] = useState<string>('All');
+  const [memberQuery, setMemberQuery] = useState<string>('');
+  const [teamFilter, setTeamFilter] = useState<string>('All');
+  const [showInsights, setShowInsights] = useState(true);
 
 
   useEffect(() => {
@@ -23,6 +31,125 @@ export default function LeaderDashboard() {
     };
     fetchGoals();
   }, []);
+
+  const GOAL_STATUS_OPTIONS = ['All', 'Draft', 'In Progress', 'Completed', 'Cancelled', 'Not started'] as const;
+  const REVIEW_STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'] as const;
+  const TEAM_OPTIONS = [
+    'All',
+    ...Array.from(
+      new Set(
+        goals
+          .map((g) => g.team)
+          .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+      )
+    ).sort(),
+  ] as const;
+
+  const visibleGoals = goals
+    .filter((g) => (goalStatusFilter === 'All' ? true : g.status === goalStatusFilter))
+    .filter((g) =>
+      reviewStatusFilter === 'All'
+        ? true
+        : (g.review_status || 'Cancelled') === reviewStatusFilter
+    );
+
+  const visibleGoalsWithMemberTeam = visibleGoals
+    .filter((g) => (teamFilter === 'All' ? true : (g.team || '') === teamFilter))
+    .filter((g) => {
+      const q = memberQuery.trim().toLowerCase();
+      if (!q) return true;
+      const hay = `${g.user_name || ''} ${g.user_email || ''} ${g.team || ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+
+  const lastWeekAnchor = new Date(now);
+  lastWeekAnchor.setDate(now.getDate() - 7);
+  const lastWeekStart = startOfWeekMonday(lastWeekAnchor);
+  const lastWeekEnd = endOfWeekMonday(lastWeekAnchor);
+  const lastWeekLabel = `${toDateOnly(lastWeekStart)} → ${toDateOnly(lastWeekEnd)}`;
+
+  const overdueGoals = goals.filter((g) => {
+    if (!g.time_bound) return false;
+    const deadline = parseDateOnly(g.time_bound);
+    const isOverdue = deadline.getTime() < todayStart.getTime();
+    const status = g.status || '';
+    return isOverdue && status !== 'Completed' && status !== 'Cancelled';
+  });
+
+  const overdueActionPlans = goals.flatMap((g) =>
+    (g.action_plans || []).flatMap((p) => {
+      if (!p.end_date) return [];
+      const end = parseDateOnly(p.end_date);
+      const isOverdue = end.getTime() < todayStart.getTime();
+      const status = p.status || '';
+      if (!isOverdue) return [];
+      if (status === 'Completed') return [];
+      return [
+        {
+          goal: g,
+          plan: p,
+        },
+      ];
+    })
+  );
+
+  const missingWeeklyReportsLastWeek = goals.flatMap((g) =>
+    (g.action_plans || []).flatMap((p) => {
+      const goalStatus = g.status || '';
+      const planStatus = p.status || '';
+      if (goalStatus !== 'In Progress') return [];
+      if (!(planStatus === 'In Progress' || planStatus === 'Blocked')) return [];
+
+      // Avoid flagging plans that start after last week ended
+      if (p.start_date) {
+        const start = parseDateOnly(p.start_date);
+        if (start.getTime() > lastWeekEnd.getTime()) return [];
+      }
+
+      const reports = p.weekly_reports || [];
+      const hasReportLastWeek = reports.some((r) => {
+        if (!r.date) return false;
+        const d = parseDateOnly(r.date);
+        return d.getTime() >= lastWeekStart.getTime() && d.getTime() <= lastWeekEnd.getTime();
+      });
+
+      if (hasReportLastWeek) return [];
+
+      const lastReportDate = reports
+        .map((r) => r.date)
+        .filter(Boolean)
+        .sort()
+        .at(-1);
+
+      return [
+        {
+          goal: g,
+          plan: p,
+          lastReportDate: lastReportDate || null,
+        },
+      ];
+    })
+  );
+
+  const pendingDeadlineChangeRequests = goals.flatMap((g) =>
+    (g.action_plans || []).flatMap((p) => {
+      if (!p.request_deadline_date) return [];
+      if (p.review_status !== 'Pending') return [];
+      return [
+        {
+          goal: g,
+          plan: p,
+          currentDeadline: p.end_date,
+          requestedDeadline: p.request_deadline_date,
+          count: p.deadline_change_count || 0,
+        },
+      ];
+    })
+  );
 
   const totalGoals = goals.length;
   const approved = goals.filter(g => g.review_status === 'Approved').length;
@@ -51,9 +178,250 @@ export default function LeaderDashboard() {
           <StatsCard title="Avg progress" stat={`${avgProgress.toFixed(1)}%`} icon={FaUsers} />
         </div>
 
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">Leader Insights</h2>
+            <Button variant="secondary" size="sm" onClick={() => setShowInsights((v) => !v)}>
+              {showInsights ? 'Hide' : 'Show'}
+            </Button>
+          </div>
+
+          {showInsights && (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-4 bg-white rounded-xl border">
+                <p className="text-sm text-gray-500">Overdue goals</p>
+                <p className="text-2xl font-bold text-red-600">{overdueGoals.length}</p>
+              </div>
+              <div className="p-4 bg-white rounded-xl border">
+                <p className="text-sm text-gray-500">Overdue action plans</p>
+                <p className="text-2xl font-bold text-red-600">{overdueActionPlans.length}</p>
+              </div>
+              <div className="p-4 bg-white rounded-xl border">
+                <p className="text-sm text-gray-500">Missing weekly report (last week)</p>
+                <p className="text-xs text-gray-400">{lastWeekLabel}</p>
+                <p className="text-2xl font-bold text-orange-600">{missingWeeklyReportsLastWeek.length}</p>
+              </div>
+            </div>
+          )}
+
+          {showInsights && (
+            <div className="mt-6 space-y-6">
+              <div className="bg-white rounded-xl border overflow-hidden">
+                <div className="px-4 py-3 border-b">
+                  <h3 className="font-semibold">Pending deadline change requests</h3>
+                  <p className="text-xs text-gray-500">Action plans pending review with requested deadline change</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="p-3 text-left">Member</th>
+                        <th className="p-3 text-left">Team</th>
+                        <th className="p-3 text-left">Goal</th>
+                        <th className="p-3 text-left">Action Plan</th>
+                        <th className="p-3 text-left">Current</th>
+                        <th className="p-3 text-left">Requested</th>
+                        <th className="p-3 text-left">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingDeadlineChangeRequests.slice(0, 10).map((x) => (
+                        <tr key={x.plan.id} className="border-t">
+                          <td className="p-3">{x.goal.user_name || x.goal.user_email}</td>
+                          <td className="p-3">{x.goal.team || '-'}</td>
+                          <td className="p-3">{x.goal.name}</td>
+                          <td className="p-3">{x.plan.activity}</td>
+                          <td className="p-3">{x.currentDeadline}</td>
+                          <td className="p-3">
+                            <span className="font-semibold text-blue-700">{x.requestedDeadline}</span>
+                          </td>
+                          <td className="p-3">{x.count}/3</td>
+                        </tr>
+                      ))}
+                      {pendingDeadlineChangeRequests.length === 0 && (
+                        <tr>
+                          <td className="p-3 text-gray-500 italic" colSpan={7}>
+                            No pending deadline change requests.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {pendingDeadlineChangeRequests.length > 10 && (
+                  <div className="px-4 py-3 text-xs text-gray-500 border-t">
+                    Showing 10/{pendingDeadlineChangeRequests.length}. Narrow using Team/Search filters above.
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white rounded-xl border overflow-hidden">
+                <div className="px-4 py-3 border-b">
+                  <h3 className="font-semibold">Missing weekly report (last week)</h3>
+                  <p className="text-xs text-gray-500">{lastWeekLabel}</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="p-3 text-left">Member</th>
+                        <th className="p-3 text-left">Team</th>
+                        <th className="p-3 text-left">Goal</th>
+                        <th className="p-3 text-left">Action Plan</th>
+                        <th className="p-3 text-left">Plan status</th>
+                        <th className="p-3 text-left">Last report</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {missingWeeklyReportsLastWeek.slice(0, 10).map((x) => (
+                        <tr key={x.plan.id} className="border-t">
+                          <td className="p-3">{x.goal.user_name || x.goal.user_email}</td>
+                          <td className="p-3">{x.goal.team || '-'}</td>
+                          <td className="p-3">{x.goal.name}</td>
+                          <td className="p-3">{x.plan.activity}</td>
+                          <td className="p-3">{x.plan.status}</td>
+                          <td className="p-3">{x.lastReportDate || 'Never'}</td>
+                        </tr>
+                      ))}
+                      {missingWeeklyReportsLastWeek.length === 0 && (
+                        <tr>
+                          <td className="p-3 text-gray-500 italic" colSpan={6}>
+                            No missing reports detected.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {missingWeeklyReportsLastWeek.length > 10 && (
+                  <div className="px-4 py-3 text-xs text-gray-500 border-t">
+                    Showing 10/{missingWeeklyReportsLastWeek.length}. Narrow using Team/Search filters above.
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white rounded-xl border overflow-hidden">
+                <div className="px-4 py-3 border-b">
+                  <h3 className="font-semibold">Overdue action plans</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="p-3 text-left">Member</th>
+                        <th className="p-3 text-left">Team</th>
+                        <th className="p-3 text-left">Goal</th>
+                        <th className="p-3 text-left">Action Plan</th>
+                        <th className="p-3 text-left">End date</th>
+                        <th className="p-3 text-left">Plan status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overdueActionPlans.slice(0, 10).map((x) => (
+                        <tr key={x.plan.id} className="border-t">
+                          <td className="p-3">{x.goal.user_name || x.goal.user_email}</td>
+                          <td className="p-3">{x.goal.team || '-'}</td>
+                          <td className="p-3">{x.goal.name}</td>
+                          <td className="p-3">{x.plan.activity}</td>
+                          <td className="p-3">{x.plan.end_date}</td>
+                          <td className="p-3">{x.plan.status}</td>
+                        </tr>
+                      ))}
+                      {overdueActionPlans.length === 0 && (
+                        <tr>
+                          <td className="p-3 text-gray-500 italic" colSpan={6}>
+                            No overdue action plans.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {overdueActionPlans.length > 10 && (
+                  <div className="px-4 py-3 text-xs text-gray-500 border-t">
+                    Showing 10/{overdueActionPlans.length}. Narrow using Team/Search filters above.
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white rounded-xl border overflow-hidden">
+                <div className="px-4 py-3 border-b">
+                  <h3 className="font-semibold">Overdue goals</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="p-3 text-left">Member</th>
+                        <th className="p-3 text-left">Team</th>
+                        <th className="p-3 text-left">Goal</th>
+                        <th className="p-3 text-left">Deadline</th>
+                        <th className="p-3 text-left">Goal status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overdueGoals.slice(0, 10).map((g) => (
+                        <tr key={g.id} className="border-t">
+                          <td className="p-3">{g.user_name || g.user_email}</td>
+                          <td className="p-3">{g.team || '-'}</td>
+                          <td className="p-3">{g.name}</td>
+                          <td className="p-3">{g.time_bound}</td>
+                          <td className="p-3">{g.status}</td>
+                        </tr>
+                      ))}
+                      {overdueGoals.length === 0 && (
+                        <tr>
+                          <td className="p-3 text-gray-500 italic" colSpan={5}>
+                            No overdue goals.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {overdueGoals.length > 10 && (
+                  <div className="px-4 py-3 text-xs text-gray-500 border-t">
+                    Showing 10/{overdueGoals.length}. Narrow using Team/Search filters above.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex space-x-6 mb-6 flex-wrap gap-y-2">
+          <Dropdown
+            label="Goal Status"
+            value={goalStatusFilter}
+            options={[...GOAL_STATUS_OPTIONS]}
+            onChange={setGoalStatusFilter}
+          />
+          <Dropdown
+            label="Review Status"
+            value={reviewStatusFilter}
+            options={[...REVIEW_STATUS_OPTIONS]}
+            onChange={setReviewStatusFilter}
+          />
+          <Dropdown
+            label="Team"
+            value={teamFilter}
+            options={[...TEAM_OPTIONS] as unknown as string[]}
+            onChange={setTeamFilter}
+          />
+          <div className="inline-block">
+            <label className="block text-sm font-semibold mb-1">Search (name/email)</label>
+            <input
+              value={memberQuery}
+              onChange={(e) => setMemberQuery(e.target.value)}
+              className="w-64 px-4 py-2 border rounded-lg"
+              placeholder="Jan / user@vinova.com.sg"
+            />
+          </div>
+        </div>
+
         {/* Goals */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {goals.map(goal => (
+          {visibleGoalsWithMemberTeam.map(goal => (
             <LeaderGoalCard
               key={goal.id}
               goal={goal}
@@ -91,6 +459,10 @@ export default function LeaderDashboard() {
                       ...g,
                       review_status: review.status,
                       leader_review_notes: review.comment,
+                      status:
+                        review.status === 'Approved' && (g.status === 'Not started' || g.status === 'Draft')
+                          ? 'In Progress'
+                          : g.status,
                     }
                     : g
                 )

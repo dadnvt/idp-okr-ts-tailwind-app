@@ -10,14 +10,18 @@ export function GoalCreateFormFields(props: {
   onFieldChange: <K extends keyof GoalDraftState>(key: K, value: GoalDraftState[K]) => void;
   onStartDateChange: (val: string) => void;
   onDurationTypeChange: (val: GoalDurationType) => void;
+  errors?: Partial<Record<keyof GoalDraftState, string>>;
 }) {
-  const { draft, onFieldChange, onStartDateChange, onDurationTypeChange } = props;
+  const { draft, onFieldChange, onStartDateChange, onDurationTypeChange, errors } = props;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Cột trái: SMART */}
       <div className="space-y-4">
-        <Input label="Goal Title" value={draft.name} onChange={(v) => onFieldChange('name', v)} />
+        <div className="space-y-1">
+          <Input label="Goal Title *" value={draft.name} onChange={(v) => onFieldChange('name', v)} />
+          {errors?.name && <p className="text-sm text-red-600">{errors.name}</p>}
+        </div>
         <Input label="Skill" value={draft.skill} onChange={(v) => onFieldChange('skill', v)} />
         <div className="flex gap-2">
           <Dropdown
@@ -41,7 +45,11 @@ export function GoalCreateFormFields(props: {
 
       {/* Cột phải: thời gian & tiến độ */}
       <div className="space-y-4">
-        <DateInput label="Start Date" value={draft.start_date} onChange={onStartDateChange} />
+        <div className="space-y-1">
+          <DateInput label="Start Date *" value={draft.start_date} onChange={onStartDateChange} />
+          {errors?.start_date && <p className="text-sm text-red-600">{errors.start_date}</p>}
+          {errors?.time_bound && <p className="text-sm text-red-600">{errors.time_bound}</p>}
+        </div>
         <DateInput
           label="Deadline"
           disabled={true}
@@ -59,12 +67,18 @@ export function GoalCreateFormFields(props: {
           options={['Draft', 'In Progress', 'Completed', 'Cancelled', 'Not started']}
           onChange={(v) => onFieldChange('status', v as GoalDraftState['status'])}
         />
-        <NumberInput
-          label="Progress (%)"
-          value={draft.progress}
-          onChange={(v) => onFieldChange('progress', v)}
-        />
-        <NumberInput label="Weight (%)" value={draft.weight} onChange={(v) => onFieldChange('weight', v)} />
+        <div className="space-y-1">
+          <NumberInput
+            label="Progress (%)"
+            value={draft.progress}
+            onChange={(v) => onFieldChange('progress', v)}
+          />
+          {errors?.progress && <p className="text-sm text-red-600">{errors.progress}</p>}
+        </div>
+        <div className="space-y-1">
+          <NumberInput label="Weight (%)" value={draft.weight} onChange={(v) => onFieldChange('weight', v)} />
+          {errors?.weight && <p className="text-sm text-red-600">{errors.weight}</p>}
+        </div>
         <Input label="Risk" value={draft.risk} onChange={(v) => onFieldChange('risk', v)} />
         <Input
           label="Dependencies"

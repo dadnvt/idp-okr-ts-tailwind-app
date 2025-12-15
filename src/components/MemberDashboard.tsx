@@ -10,24 +10,43 @@ import { useAuth } from '../common/AuthContext';
 import { YEAR_OPTIONS } from '../common/constants';
 import { GoalCreateFormFields } from './goals/GoalCreateFormFields';
 import { useGoalDraft } from './goals/useGoalDraft';
+import { Button } from './Button';
 import {
   createGoal,
   deleteGoal as apiDeleteGoal,
   fetchGoals as apiFetchGoals,
+  requestGoalReview,
+  cancelGoalReview,
   updateGoal as apiUpdateGoal,
 } from '../api/goalsApi';
+import { Input } from './Input';
+import { DateInput } from './DateInput';
+import { NumberInput } from './NumberInput';
 
 export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goal: IGoal) => void }) {
   const { auth } = useAuth();
   const years = YEAR_OPTIONS;
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [goalStatusFilter, setGoalStatusFilter] = useState<string>('All');
+  const [reviewStatusFilter, setReviewStatusFilter] = useState<string>('All');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
   const [selectedGoal, setSelectedGoal] = useState<IGoal | null>(null);
   const [goals, setGoals] = useState<IGoal[]>([]);
   const [deleteGoal, setDeleteGoal] = useState<IGoal | null>(null);
   const [editGoal, setEditGoal] = useState<IGoal | null>(null);
 
-  const filteredGoals = goals.filter(g => g.year === Number(selectedYear));
+  const GOAL_STATUS_OPTIONS = ['All', 'Draft', 'In Progress', 'Completed', 'Cancelled', 'Not started'] as const;
+  const REVIEW_STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'] as const;
+
+  const filteredGoals = goals
+    .filter((g) => g.year === Number(selectedYear))
+    .filter((g) => (goalStatusFilter === 'All' ? true : g.status === goalStatusFilter))
+    .filter((g) =>
+      reviewStatusFilter === 'All'
+        ? true
+        : (g.review_status || 'Cancelled') === reviewStatusFilter
+    );
   const inProgressGoals = filteredGoals.filter(g => g.status === 'In Progress').length;
   const completedGoals = filteredGoals.filter(g => g.status === 'Completed').length;
   const failedGoals = filteredGoals.filter(g => new Date(g.time_bound) < new Date()).length;
@@ -50,8 +69,30 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
     loadGoals();
   }, []);
 
+  function validateCreateGoal() {
+    const next: Record<string, string> = {};
+
+    if (!draft.name.trim()) next.name = 'Goal title is required';
+    if (!draft.start_date) next.start_date = 'Start date is required';
+    if (!draft.time_bound) next.time_bound = 'Deadline could not be calculated. Please select a start date.';
+    if (draft.start_date && draft.time_bound && draft.time_bound < draft.start_date) {
+      next.time_bound = 'Deadline must be on or after start date';
+    }
+
+    if (Number.isNaN(draft.progress) || draft.progress < 0 || draft.progress > 100) {
+      next.progress = 'Progress must be between 0 and 100';
+    }
+    if (Number.isNaN(draft.weight) || draft.weight < 0 || draft.weight > 100) {
+      next.weight = 'Weight must be between 0 and 100';
+    }
+
+    setCreateErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
   async function handleCreateGoal(e: React.FormEvent) {
     e.preventDefault();
+    if (!validateCreateGoal()) return;
     try {
       const token = auth.token;
       const userId = auth.user?.id;
@@ -59,6 +100,8 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
       const newGoal = {
         user_id: userId,
         user_email: auth.user?.email,
+        user_name: auth.user?.name,
+        team: auth.user?.team || '',
         year: new Date().getFullYear(),
         name: draft.name,
         type: draft.type,
@@ -85,6 +128,7 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
       setShowCreateModal(false);
       setGoals((prev) => [...prev, result.data]);
       reset();
+      setCreateErrors({});
     } catch (err) {
       console.error('Error creating goal:', err);
     }
@@ -128,17 +172,29 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
           Dashboard IDP/OKR
         </h1>
         <p className="text-xl text-gray-500 mb-10">
-          Halo, {auth.user?.email || 'bạn'} 👋
+          Halo, {auth.user?.name || auth.user?.email || 'bạn'} 👋
           {auth.user?.role}
         </p>
 
         {/* Dropdown chọn năm */}
-        <div className="flex space-x-6 mb-6">
+        <div className="flex space-x-6 mb-6 flex-wrap gap-y-2">
           <Dropdown
             label="Year"
             value={selectedYear}
             options={years}
             onChange={setSelectedYear}
+          />
+          <Dropdown
+            label="Goal Status"
+            value={goalStatusFilter}
+            options={[...GOAL_STATUS_OPTIONS]}
+            onChange={setGoalStatusFilter}
+          />
+          <Dropdown
+            label="Review Status"
+            value={reviewStatusFilter}
+            options={[...REVIEW_STATUS_OPTIONS]}
+            onChange={setReviewStatusFilter}
           />
         </div>
 
@@ -172,12 +228,13 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
             <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100">
               Goal In-progress ({filteredGoals.length})
             </h2>
-            <button
-              className="flex items-center px-6 py-3 bg-brand text-white font-semibold rounded-lg shadow-md hover:bg-brand-dark transition duration-300"
-              onClick={() => setShowCreateModal(true)} // mở modal tạo goal
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              variant="primary"
+              className="flex items-center px-6 py-3 shadow-md"
             >
               <FaPlus className="mr-2" /> Add Goal
-            </button>
+            </Button>
           </div>
 
           {/* Danh sách goals */}
@@ -189,6 +246,7 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
                 onDetailClick={setSelectedGoal}
                 onDeleteClick={setDeleteGoal}
                 onUpdateClick={setEditGoal}
+                showActions={auth.user?.role !== 'leader'}
               />
             ))}
           </div>
@@ -198,7 +256,10 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
           <Modal
             isOpen={showCreateModal}
             title="New Goal"
-            onClose={() => setShowCreateModal(false)}
+            onClose={() => {
+              setShowCreateModal(false);
+              setCreateErrors({});
+            }}
           >
             <form className="space-y-4" onSubmit={handleCreateGoal}>
               <GoalCreateFormFields
@@ -206,14 +267,12 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
                 onFieldChange={setField}
                 onStartDateChange={onStartDateChange}
                 onDurationTypeChange={onDurationTypeChange}
+                errors={createErrors}
               />
               <div className="flex justify-end mt-6 space-x-4">
-                <button
-                  type="submit"
-                  className="px-6 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700"
-                >
+                <Button type="submit" variant="primary">
                   Add Goal
-                </button>
+                </Button>
               </div>
             </form>
           </Modal>
@@ -241,10 +300,12 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
                 onChange={(val) => setEditGoal({ ...editGoal, progress: val })} />
 
               <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => setEditGoal(null)}
-                  className="px-4 py-2 border rounded">Cancel</button>
-                <button type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+                <Button type="button" variant="secondary" onClick={() => setEditGoal(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary">
+                  Save
+                </Button>
               </div>
             </form>
           </Modal>
@@ -263,19 +324,12 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
             </p>
             <form className="space-y-4" onSubmit={handleDeleteGoal}>
               <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDeleteGoal(null)}
-                  className="px-4 py-2 border rounded"
-                >
+                <Button type="button" variant="secondary" onClick={() => setDeleteGoal(null)}>
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-red-600 text-white rounded"
-                >
+                </Button>
+                <Button type="submit" variant="danger">
                   Confirm
-                </button>
+                </Button>
               </div>
             </form>
           </Modal>
@@ -295,6 +349,42 @@ export default function MemberDashboard({ onDetailClick }: { onDetailClick: (goa
                 <p><strong>Goal Type:</strong> {selectedGoal.type}</p>
                 <p><strong>Skill related:</strong> {selectedGoal.skill}</p>
                 <p><strong>Goal Status:</strong> {selectedGoal.status}</p>
+                <p><strong>Review:</strong> {selectedGoal.review_status ?? 'Not requested'}</p>
+                {selectedGoal.leader_review_notes && (
+                  <p><strong>Leader notes:</strong> {selectedGoal.leader_review_notes}</p>
+                )}
+
+                {selectedGoal.review_status === 'Pending' && selectedGoal.is_locked && (
+                  <div className="pt-3">
+                    <Button
+                      variant="secondary"
+                      onClick={async () => {
+                        const { res, result } = await cancelGoalReview(auth.token, selectedGoal.id);
+                        if (!res.ok) return alert(result.error || 'Cancel request failed');
+                        setGoals((prev) => prev.map((g) => (g.id === selectedGoal.id ? result.data : g)));
+                        setSelectedGoal(result.data);
+                      }}
+                    >
+                      Cancel review request (unlock)
+                    </Button>
+                  </div>
+                )}
+
+                {selectedGoal.review_status !== 'Approved' && !selectedGoal.is_locked && (
+                  <div className="pt-3">
+                    <Button
+                      variant="primary"
+                      onClick={async () => {
+                        const { res, result } = await requestGoalReview(auth.token, selectedGoal.id);
+                        if (!res.ok) return alert(result.error || 'Request review failed');
+                        setGoals((prev) => prev.map((g) => (g.id === selectedGoal.id ? result.data : g)));
+                        setSelectedGoal(result.data);
+                      }}
+                    >
+                      Request leader review (lock)
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </Modal>

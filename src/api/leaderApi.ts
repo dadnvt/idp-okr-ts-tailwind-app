@@ -18,7 +18,26 @@ export async function reviewLeaderGoal(
   const res = await apiFetch(
     `${API_PATHS.leaderGoals}/${goalId}/review`,
     {
-      method: 'POST',
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(review),
+    },
+    token
+  );
+  return { res };
+}
+
+export async function reviewLeaderActionPlan(
+  token: string | null,
+  actionPlanId: string,
+  review: unknown
+) {
+  const res = await apiFetch(
+    `${API_PATHS.leaderActionPlans}/${actionPlanId}/review`,
+    {
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },

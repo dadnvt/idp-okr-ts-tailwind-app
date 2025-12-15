@@ -38,4 +38,54 @@ export async function createActionPlan(
   return { res, result };
 }
 
+export async function updateActionPlan(
+  token: string | null,
+  actionPlanId: string,
+  payload: Partial<IActionPlan>
+) {
+  const res = await apiFetch(
+    `${API_PATHS.actionPlans}/${actionPlanId}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+    token
+  );
+  const result = (await res.json()) as ApiEnvelope<IActionPlan> & { message?: string; error?: string };
+  return { res, result: { data: result.data, error: result.error || result.message } as ApiEnvelope<IActionPlan> };
+}
+
+export async function requestActionPlanReview(token: string | null, actionPlanId: string) {
+  const res = await apiFetch(
+    `${API_PATHS.actionPlans}/${actionPlanId}/request-review`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+    token
+  );
+  const result = (await res.json()) as ApiEnvelope<IActionPlan>;
+  return { res, result };
+}
+
+export async function cancelActionPlanReview(token: string | null, actionPlanId: string) {
+  const res = await apiFetch(
+    `${API_PATHS.actionPlans}/${actionPlanId}/cancel-review`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+    token
+  );
+  const result = (await res.json()) as ApiEnvelope<IActionPlan>;
+  return { res, result };
+}
+
 

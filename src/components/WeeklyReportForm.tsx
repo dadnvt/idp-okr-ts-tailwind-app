@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import type { IActionPlan, IReportFormInput } from '../types'; 
 import type { SubmitHandler } from 'react-hook-form';
 import { FaPaperPlane, FaTimes } from 'react-icons/fa';
+import { Button } from './Button';
 
 // --- Giả định Action Plan (Dùng cho mock test) ---
 const mockActionPlan: IActionPlan = {
@@ -131,27 +132,25 @@ const WeeklyReportForm: React.FC<WeeklyReportFormProps> = ({ actionPlan, onClose
           />
 
           <div className="flex justify-end pt-4 space-x-4">
-            <button 
-                type="button" 
-                onClick={onClose} 
-                disabled={isSubmitting}
-                className="flex items-center px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-100 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700 transition duration-300"
+            <Button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              variant="secondary"
+              className="flex items-center px-6 py-3"
             >
               <FaTimes className="mr-2" />
               Hủy
-            </button>
-            <button 
-                type="submit" 
-                disabled={isSubmitting}
-                className={`flex items-center px-6 py-3 text-white font-semibold rounded-lg shadow-md transition duration-300 
-                            ${isSubmitting 
-                                ? 'bg-gray-400 cursor-not-allowed' 
-                                : 'bg-brand hover:bg-brand-dark'
-                            }`}
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              variant="primary"
+              className="flex items-center px-6 py-3"
             >
               <FaPaperPlane className="mr-2" />
               {isSubmitting ? 'Đang Gửi...' : 'Gửi Báo Cáo'}
-            </button>
+            </Button>
           </div>
         </div>
       </form>

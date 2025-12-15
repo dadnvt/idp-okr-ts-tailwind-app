@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { signUp, confirmSignUp } from '@aws-amplify/auth';
+import { Button } from './Button';
 
 export default function SignUpModal({
   isOpen,
@@ -62,12 +63,15 @@ export default function SignUpModal({
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-md p-6 relative animate-fadeIn">
-        <button
+        <Button
           onClick={onClose}
+          variant="ghost"
+          size="sm"
           className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+          aria-label="Close"
         >
           ✕
-        </button>
+        </Button>
 
         {step === 'signup' && (
           <>
@@ -87,12 +91,9 @@ export default function SignUpModal({
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:outline-none"
               />
-              <button
-                onClick={handleSignUp}
-                className="w-full bg-brand text-white py-2 rounded-lg hover:bg-brand-dark transition"
-              >
+              <Button onClick={handleSignUp} fullWidth variant="primary">
                 Đăng ký
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -113,12 +114,9 @@ export default function SignUpModal({
                 onChange={(e) => setCode(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:outline-none"
               />
-              <button
-                onClick={handleConfirm}
-                className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition"
-              >
+              <Button onClick={handleConfirm} fullWidth variant="success">
                 Xác nhận
-              </button>
+              </Button>
             </div>
           </>
         )}

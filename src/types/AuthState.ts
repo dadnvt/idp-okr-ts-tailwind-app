@@ -3,6 +3,7 @@ export interface UserInfo {
   id?: string | null;
   email?: string | null;
   name?: string | null;
+  team?: string | null;
   role?: string | null;
 }
 

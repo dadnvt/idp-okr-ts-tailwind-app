@@ -8,26 +8,57 @@ import Sidebar from '../components/Sidebar';
 import { YEAR_OPTIONS } from '../common/constants';
 import { GoalCreateFormFields } from '../components/goals/GoalCreateFormFields';
 import { useGoalDraft } from '../components/goals/useGoalDraft';
+import { Button } from '../components/Button';
 import {
   createGoal,
   deleteGoal as apiDeleteGoal,
   fetchGoals as apiFetchGoals,
+  requestGoalReview,
+  cancelGoalReview,
   updateGoal as apiUpdateGoal,
 } from '../api/goalsApi';
 
 export default function GoalsPage() {
   const years = YEAR_OPTIONS;
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [goalStatusFilter, setGoalStatusFilter] = useState<string>('All');
+  const [reviewStatusFilter, setReviewStatusFilter] = useState<string>('All');
   const [detailGoal, setDetailGoal] = useState<IGoal | null>(null);
   const [isAddGoalOpen, setIsAddGoalOpen] = useState(false);
+  const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
   const [deleteGoal, setDeleteGoal] = useState<IGoal | null>(null);
   const [editGoal, setEditGoal] = useState<IGoal | null>(null);
   const [goals , setGoals] = useState<IGoal[]>([]);
   const { auth } = useAuth();
   const { draft, setField, onDurationTypeChange, onStartDateChange, reset } = useGoalDraft();
 
+  const GOAL_STATUS_OPTIONS = ['All', 'Draft', 'In Progress', 'Completed', 'Cancelled', 'Not started'] as const;
+  const REVIEW_STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'] as const;
+
+  function validateCreateGoal() {
+    const next: Record<string, string> = {};
+
+    if (!draft.name.trim()) next.name = 'Goal title is required';
+    if (!draft.start_date) next.start_date = 'Start date is required';
+    if (!draft.time_bound) next.time_bound = 'Deadline could not be calculated. Please select a start date.';
+    if (draft.start_date && draft.time_bound && draft.time_bound < draft.start_date) {
+      next.time_bound = 'Deadline must be on or after start date';
+    }
+
+    if (Number.isNaN(draft.progress) || draft.progress < 0 || draft.progress > 100) {
+      next.progress = 'Progress must be between 0 and 100';
+    }
+    if (Number.isNaN(draft.weight) || draft.weight < 0 || draft.weight > 100) {
+      next.weight = 'Weight must be between 0 and 100';
+    }
+
+    setCreateErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
   async function handleCreateGoal(e: React.FormEvent) {
     e.preventDefault();
+    if (!validateCreateGoal()) return;
     try {
       const token = auth.token;
       const userId = auth.user?.id;
@@ -35,6 +66,8 @@ export default function GoalsPage() {
       const newGoal = {
         user_id: userId,
         user_email: auth.user?.email,
+        user_name: auth.user?.name,
+        team: auth.user?.team || '',
         year: new Date().getFullYear(),
         name: draft.name,
         type: draft.type,
@@ -60,6 +93,7 @@ export default function GoalsPage() {
       
       setGoals((prev) => [...prev, result.data]);
       reset();
+      setCreateErrors({});
       setIsAddGoalOpen(false);
     } catch (err) {
       console.error('Error creating goal:', err);
@@ -107,10 +141,14 @@ export default function GoalsPage() {
     loadGoals();
   }, [auth.token]);
 
-  const filteredGoals = goals.filter(
-    (g) =>
-      g.year === Number(selectedYear)
-  );
+  const filteredGoals = goals
+    .filter((g) => g.year === Number(selectedYear))
+    .filter((g) => (goalStatusFilter === 'All' ? true : g.status === goalStatusFilter))
+    .filter((g) =>
+      reviewStatusFilter === 'All'
+        ? true
+        : (g.review_status || 'Cancelled') === reviewStatusFilter
+    );
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -118,21 +156,30 @@ export default function GoalsPage() {
 
       <main className="flex-1 p-8">
         <h1 className="text-3xl font-bold mb-6">Goals</h1>
-        <div className="flex space-x-6 mb-6">
+        <div className="flex space-x-6 mb-6 flex-wrap gap-y-2">
           <Dropdown
               label="Year"
               value={selectedYear}
               options={years}
               onChange={setSelectedYear}
             />
+          <Dropdown
+            label="Goal Status"
+            value={goalStatusFilter}
+            options={[...GOAL_STATUS_OPTIONS]}
+            onChange={setGoalStatusFilter}
+          />
+          <Dropdown
+            label="Review Status"
+            value={reviewStatusFilter}
+            options={[...REVIEW_STATUS_OPTIONS]}
+            onChange={setReviewStatusFilter}
+          />
         </div>
 
-        <button
-          className="bg-brand text-white px-4 py-2 rounded hover:bg-brand-dark mb-6"
-          onClick={() => setIsAddGoalOpen(true)}
-        >
+        <Button onClick={() => setIsAddGoalOpen(true)} variant="primary" className="mb-6">
           + Add Goal
-        </button>
+        </Button>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredGoals.map((goal) => (
@@ -142,6 +189,7 @@ export default function GoalsPage() {
               onDetailClick={() => setDetailGoal(goal)}
               onDeleteClick={setDeleteGoal}
               onUpdateClick={setEditGoal}
+              showActions={auth.user?.role !== 'leader'}
             />
           ))}
         </div>
@@ -168,10 +216,12 @@ export default function GoalsPage() {
                 onChange={(val) => setEditGoal({ ...editGoal, progress: val })} />
 
               <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => setEditGoal(null)}
-                  className="px-4 py-2 border rounded">Cancel</button>
-                <button type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+                <Button type="button" variant="secondary" onClick={() => setEditGoal(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary">
+                  Save
+                </Button>
               </div>
             </form>
           </Modal>
@@ -190,19 +240,12 @@ export default function GoalsPage() {
             </p>
             <form className="space-y-4" onSubmit={handleDeleteGoal}>
               <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setDeleteGoal(null)}
-                  className="px-4 py-2 border rounded"
-                >
+                <Button type="button" variant="secondary" onClick={() => setDeleteGoal(null)}>
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-red-600 text-white rounded"
-                >
+                </Button>
+                <Button type="submit" variant="danger">
                   Confirm
-                </button>
+                </Button>
               </div>
             </form>
           </Modal>
@@ -214,6 +257,7 @@ export default function GoalsPage() {
           onClose={() => {
             setDetailGoal(null);
             setIsAddGoalOpen(false);
+            setCreateErrors({});
           }}
         >
           {detailGoal?.id ? (
@@ -230,6 +274,46 @@ export default function GoalsPage() {
               <p>
                 <strong>Status:</strong> {detailGoal.status}
               </p>
+              <p>
+                <strong>Review:</strong> {detailGoal.review_status ?? 'Not requested'}
+              </p>
+              {detailGoal.leader_review_notes && (
+                <p>
+                  <strong>Leader notes:</strong> {detailGoal.leader_review_notes}
+                </p>
+              )}
+
+              {detailGoal.review_status === 'Pending' && detailGoal.is_locked && (
+                <div className="pt-3">
+                  <Button
+                    variant="secondary"
+                    onClick={async () => {
+                      const { res, result } = await cancelGoalReview(auth.token, detailGoal.id);
+                      if (!res.ok) return alert(result.error || 'Cancel request failed');
+                      setGoals((prev) => prev.map((g) => (g.id === detailGoal.id ? result.data : g)));
+                      setDetailGoal(result.data);
+                    }}
+                  >
+                    Cancel review request (unlock)
+                  </Button>
+                </div>
+              )}
+
+              {detailGoal.review_status !== 'Approved' && !detailGoal.is_locked && (
+                <div className="pt-3">
+                  <Button
+                    variant="primary"
+                    onClick={async () => {
+                      const { res, result } = await requestGoalReview(auth.token, detailGoal.id);
+                      if (!res.ok) return alert(result.error || 'Request review failed');
+                      setGoals((prev) => prev.map((g) => (g.id === detailGoal.id ? result.data : g)));
+                      setDetailGoal(result.data);
+                    }}
+                  >
+                    Request leader review (lock)
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <form className="space-y-4" onSubmit={handleCreateGoal}>
@@ -238,14 +322,12 @@ export default function GoalsPage() {
                 onFieldChange={setField}
                 onStartDateChange={onStartDateChange}
                 onDurationTypeChange={onDurationTypeChange}
+                errors={createErrors}
               />
               <div className="flex justify-end mt-6 space-x-4">
-                <button
-                  type="submit"
-                  className="px-6 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700"
-                >
+                <Button type="submit" variant="primary">
                   Add Goal
-                </button>
+                </Button>
               </div>
             </form>
           )}

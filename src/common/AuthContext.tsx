@@ -41,6 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: attributes.sub,
         email: attributes.email,
         name: attributes.name || attributes.email,
+        // We use Cognito standard attribute `locale` as team code/name (per project convention).
+        team: attributes.locale || null,
         role : role
       },
     });
@@ -69,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: attributes.sub,
             email: attributes.email,
             name: attributes.name || attributes.email,
+            team: attributes.locale || null,
             role : role
           },
         });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { FaTimes } from 'react-icons/fa';
+import { Button } from '../components/Button';
 
 interface ModalProps {
   isOpen: boolean;
@@ -18,12 +19,15 @@ const Modal: React.FC<ModalProps> = ({ isOpen, title, children, onClose }) => {
         {/* Header */}
         <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
-          <button
+          <Button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+            variant="ghost"
+            size="sm"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            aria-label="Close modal"
           >
             <FaTimes size={18} />
-          </button>
+          </Button>
         </div>
 
         {/* Nội dung */}

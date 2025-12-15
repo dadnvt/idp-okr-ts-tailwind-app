@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Dropdown from './Dropdown';
 import { useAuth } from '../common/AuthContext';
 import { Input } from './Input';
+import { DateInput } from './DateInput';
+import { Textarea } from './Textarea';
+import { Button } from './Button';
 
 export function CreateActionPlanForm({
   goalId,
@@ -19,43 +22,70 @@ export function CreateActionPlanForm({
   const [resources, setResourse] = useState('');
   const [status, setStatus] = useState('Not Started');
   const [expectedOutcome, setExpectedOutcome] = useState('');
+  const [owner, setOwner] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { auth } = useAuth();
 
+  const effectiveOwner = useMemo(() => {
+    return owner.trim() || auth.user?.name || auth.user?.email || '';
+  }, [owner, auth.user?.name, auth.user?.email]);
+
+  function validate() {
+    const next: Record<string, string> = {};
+
+    if (!activity.trim()) next.activity = 'Activity is required';
+    if (!startDate) next.start_date = 'Start date is required';
+    if (!endDate) next.end_date = 'End date is required';
+
+    if (startDate && endDate && endDate < startDate) {
+      next.end_date = 'End date must be on or after start date';
+    }
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
 
     onSubmit({
       goal_id: goalId,
-      activity,
+      activity: activity.trim(),
       start_date: startDate,
       end_date: endDate,
-      expected_outcome: expectedOutcome,
+      expected_outcome: expectedOutcome.trim(),
       status: status,
-      owner: auth.user?.email,
-      evidence_link: evidenceLink,
-      resources: resources
+      owner: effectiveOwner,
+      evidence_link: evidenceLink.trim(),
+      resources: resources.trim(),
     });
   };
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      <Input label="Activity" value={activity} onChange={setActivity} />
+      <div className="space-y-1">
+        <Input label="Activity *" value={activity} onChange={setActivity} />
+        {errors.activity && <p className="text-sm text-red-600">{errors.activity}</p>}
+      </div>
 
-      <input
-        type="date"
-        className="w-full border p-2 rounded"
-        value={startDate}
-        onChange={e => setStartDate(e.target.value)}
-        required
-      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <DateInput label="Start date *" value={startDate} onChange={setStartDate} />
+          {errors.start_date && <p className="text-sm text-red-600">{errors.start_date}</p>}
+        </div>
+        <div className="space-y-1">
+          <DateInput label="End date *" value={endDate} onChange={setEndDate} />
+          {errors.end_date && <p className="text-sm text-red-600">{errors.end_date}</p>}
+        </div>
+      </div>
 
-      <input
-        type="date"
-        className="w-full border p-2 rounded"
-        value={endDate}
-        onChange={e => setEndDate(e.target.value)}
-        required
+      <Input
+        label="Owner (optional)"
+        value={owner}
+        onChange={setOwner}
+        placeholder={auth.user?.name || auth.user?.email || ''}
       />
 
       <Dropdown
@@ -70,29 +100,34 @@ export function CreateActionPlanForm({
         onChange={(val) => setStatus(val)}
       />
 
-      <textarea
-        className="w-full border p-2 rounded"
-        placeholder="Expected outcome"
+      <Textarea
+        label="Expected outcome (optional)"
         value={expectedOutcome}
-        onChange={e => setExpectedOutcome(e.target.value)}
-        required
+        onChange={setExpectedOutcome}
+        placeholder="Expected outcome"
+      />
+
+      <Textarea
+        label="Resources (optional)"
+        value={resources}
+        onChange={setResourse}
+        placeholder="Resources"
+      />
+
+      <Input
+        label="Evidence link (optional)"
+        value={evidenceLink}
+        onChange={setEvidenceLink}
+        placeholder="https://..."
       />
 
       <div className="flex justify-end gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 border rounded"
-        >
+        <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
-        </button>
-
-        <button
-          type="submit"
-          className="px-4 py-2 bg-brand text-white rounded"
-        >
+        </Button>
+        <Button type="submit" variant="primary">
           Save
-        </button>
+        </Button>
       </div>
     </form>
   );

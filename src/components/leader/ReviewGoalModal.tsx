@@ -2,6 +2,7 @@ import { useState } from "react";
 import Modal from "../../common/Modal";
 import type { IGoal } from "../../types";
 import Dropdown from "../Dropdown";
+import { Button } from "../Button";
 
 type ReviewStatus = 'Approved' | 'Rejected' | 'Pending';
 
@@ -50,12 +51,14 @@ export default function ReviewGoalModal({
       />
 
       {/* Submit */}
-      <button
+      <Button
         onClick={() => onSubmit({ status, comment })}
-        className="w-full bg-green-600 text-white py-2 rounded mt-4"
+        variant="success"
+        fullWidth
+        className="mt-4"
       >
         Save
-      </button>
+      </Button>
     </Modal>
   );
 }
