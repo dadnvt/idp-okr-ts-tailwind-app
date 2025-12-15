@@ -1,21 +1,28 @@
 // src/types/index.ts
 
+type GoalStatus =
+  | 'Draft'
+  | 'In Progress'
+  | 'Completed'
+  | 'Cancelled'
+  | 'Not started';
+
 export interface IGoal {
-  id: string; 
+  id: string;
   user_id: string;
   year: number;
-  name: string; 
-  user_email: string; 
+  name: string;
+  user_email: string;
   type: 'Hard' | 'Soft'; // Mục tiêu kỹ thuật hay kỹ năng mềm
   skill: string;
   specific: string; // Trong cấu trúc SMART
   measurable: string;
   achievable: string;
   relevant: string;
-  start_date: string; 
+  start_date: string;
   time_bound: string; // Hạn chót
   success_metric: string;
-  status: 'Draft' | 'In Progress' | 'Completed' | 'Cancelled' | 'Not started'; 
+  status: GoalStatus;
   weight: number; // Trọng số
   progress: number; // Tiến độ (%)
   risk: string;
@@ -24,8 +31,8 @@ export interface IGoal {
   is_locked: boolean; // Trạng thái khóa (do Leader review)
   leader_review_notes: string; // Ghi chú đánh giá của Leader
   review_status: string;
-  duration_type : string;
-  actionPlans?: IActionPlan[];
+  duration_type: string;
+  action_plans?: IActionPlan[];
 }
 
 export interface IActionPlan {
@@ -42,16 +49,16 @@ export interface IActionPlan {
   weeklyReports?: IWeeklyReport[];
 }
 
-export interface IWeeklyReport  {
-  id : string,
-  goal_id : string,
+export interface IWeeklyReport {
+  id: string,
+  goal_id: string,
   action_plan_id: string,
-  date : string,
-  summary : string,
+  date: string,
+  summary: string,
   work_done: string; // Công việc đã hoàn thành trong tuần
   blockers_challenges: string; // Các vấn đề/cản trở
   next_week_plan: string; // Kế hoạch cho tuần tiếp theo,
-  lead_feedback : string;
+  lead_feedback: string;
 }
 
 interface IUser {

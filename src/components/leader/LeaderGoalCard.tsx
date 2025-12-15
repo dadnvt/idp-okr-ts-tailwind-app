@@ -27,7 +27,7 @@ export default function LeaderGoalCard({ goal, onReviewClick }: Props) {
         onClick={() => onReviewClick(goal)}
         className="mt-4 w-full bg-brand text-white py-2 rounded hover:bg-brand-dark"
       >
-        Đánh giá
+        Review
       </button>
     </div>
   );

@@ -1,3 +1,5 @@
+import type { IGoal } from "../types";
+
 export function getQuarter(month: number): number {
   if (month >= 1 && month <= 3) return 1;   // Q1: Jan–Mar
   if (month >= 4 && month <= 6) return 2;   // Q2: Apr–Jun
@@ -41,7 +43,7 @@ export function getHalfYearLabel(startDate: string, endDate: string): string {
 }
 
 export function validateForm(data: typeof FormData) {
-  const newErrors: {[key:string]: string} = {};
+  const newErrors: { [key: string]: string } = {};
 
   Object.entries(data).forEach(([key, value]) => {
     if (!value || value.trim() === '') {
@@ -49,4 +51,22 @@ export function validateForm(data: typeof FormData) {
     }
   });
   return newErrors;
+}
+
+export function getGoalHealth(goal: IGoal): "On Track" | "At Risk" | "High Risk" {
+  const now = new Date();
+  const start = new Date(goal.start_date);
+  const end = new Date(goal.time_bound);
+
+  const totalDuration = end.getTime() - start.getTime();
+  const elapsed = now.getTime() - start.getTime();
+  const expectedProgress = Math.min(100, Math.round((elapsed / totalDuration) * 100));
+
+  if (goal.progress < expectedProgress - 20) {
+    return "High Risk";
+  }
+  if (goal.progress < expectedProgress - 10) {
+    return "At Risk";
+  }
+  return "On Track";
 }

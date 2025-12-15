@@ -16,7 +16,7 @@ export function CreateActionPlanForm({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [evidenceLink, setEvidenceLink] = useState('');
-  const [resourse, setResourse] = useState('');
+  const [resources, setResourse] = useState('');
   const [status, setStatus] = useState('Not Started');
   const [expectedOutcome, setExpectedOutcome] = useState('');
 
@@ -32,9 +32,9 @@ export function CreateActionPlanForm({
       end_date: endDate,
       expected_outcome: expectedOutcome,
       status: status,
-      owner : auth.user?.email,
-      evidence_link : evidenceLink,
-      resourse: resourse
+      owner: auth.user?.email,
+      evidence_link: evidenceLink,
+      resources: resources
     });
   };
 

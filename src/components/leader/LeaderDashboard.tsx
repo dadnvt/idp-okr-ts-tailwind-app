@@ -45,14 +45,14 @@ export default function LeaderDashboard() {
           Leader Dashboard
         </h1>
         <p className="text-xl text-gray-500 mb-10">
-          Theo dõi & đánh giá goals của team 👥
+          Follow & reivew goals of team 👥
         </p>
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-          <StatsCard title="Goals chờ review" stat={pending} icon={FaBullseye} />
-          <StatsCard title="Goals đã duyệt" stat={approved} icon={FaClipboardList} />
-          <StatsCard title="Tiến độ TB" stat={`${avgProgress.toFixed(1)}%`} icon={FaUsers} />
+          <StatsCard title="Goals to review" stat={pending} icon={FaBullseye} />
+          <StatsCard title="Goals approved" stat={approved} icon={FaClipboardList} />
+          <StatsCard title="Avg progress" stat={`${avgProgress.toFixed(1)}%`} icon={FaUsers} />
         </div>
 
         {/* Goals */}
@@ -70,7 +70,7 @@ export default function LeaderDashboard() {
         {selectedGoal && (
           <Modal
             isOpen
-            title="Chi tiết Goal"
+            title="Detail Goal"
             onClose={() => setSelectedGoal(null)}
           >
             <p><strong>Member:</strong> {selectedGoal.user_email}</p>
@@ -100,15 +100,15 @@ export default function LeaderDashboard() {
 
               setGoals(prev =>
                 prev.map(g =>
-                    g.id === reviewGoal.id
+                  g.id === reviewGoal.id
                     ? {
-                        ...g,
-                        review_status: review.status,
-                        leader_review_notes: review.comment,
-                        }
+                      ...g,
+                      review_status: review.status,
+                      leader_review_notes: review.comment,
+                    }
                     : g
                 )
-                );
+              );
               setReviewGoal(null);
             }}
           />

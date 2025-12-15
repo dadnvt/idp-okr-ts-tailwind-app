@@ -25,7 +25,7 @@ export default function ReviewGoalModal({
   const [comment, setComment] = useState('');
 
   return (
-    <Modal isOpen={true} title="Đánh giá Goal" onClose={onClose}>
+    <Modal isOpen={true} title="Review Goal" onClose={onClose}>
       <p>
         <strong>Member:</strong> {goal.user_email}
       </p>
@@ -35,11 +35,11 @@ export default function ReviewGoalModal({
 
       {/* Status */}
       <Dropdown
-          label="Goal Status"
-          value={status}
-          options={['Approved', 'Rejected', 'Pending']}
-          onChange={(v) => setStatus(v as ReviewStatus)}
-        />
+        label="Goal Status"
+        value={status}
+        options={['Approved', 'Rejected', 'Pending']}
+        onChange={(v) => setStatus(v as ReviewStatus)}
+      />
 
       {/* Comment */}
       <textarea
@@ -54,7 +54,7 @@ export default function ReviewGoalModal({
         onClick={() => onSubmit({ status, comment })}
         className="w-full bg-green-600 text-white py-2 rounded mt-4"
       >
-        Lưu đánh giá
+        Save
       </button>
     </Modal>
   );

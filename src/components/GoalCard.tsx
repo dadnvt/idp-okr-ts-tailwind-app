@@ -1,7 +1,6 @@
-import { FaArrowRight, FaEdit, FaRemoveFormat, FaTrash } from 'react-icons/fa';
-import type { IGoal } from '../types';
-import { getHalfYearLabel, getQuarterFromDate } from '../common/Utility';
-import { FaDeleteLeft } from 'react-icons/fa6';
+import { FaArrowRight, FaEdit, FaTrash } from 'react-icons/fa';
+import type { IActionPlan, IGoal } from '../types';
+import { getGoalHealth, getHalfYearLabel, getQuarterFromDate } from '../common/Utility';
 
 interface GoalCardProps {
   goal: IGoal;
@@ -26,8 +25,10 @@ export default function GoalCard({ goal, onDetailClick, onDeleteClick, onUpdateC
     return '';
   };
 
+  const health = getGoalHealth(goal);
+
   return (
-    <div 
+    <div
       className={`p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 
                   hover:shadow-2xl hover:scale-[1.02] transition duration-300 relative group
                   ${goal.is_locked ? 'bg-red-50 dark:bg-red-900/20 border-red-300' : 'bg-white dark:bg-gray-800'}`}
@@ -45,11 +46,11 @@ export default function GoalCard({ goal, onDetailClick, onDeleteClick, onUpdateC
           Deadline: {goal.time_bound}
         </p>
       </div>
-      
+
       <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 line-clamp-2">
         {goal.name}
       </h3>
-      
+
       {goal.is_locked && (
         <div className="flex items-center text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-300 px-3 py-1 rounded-full w-fit mb-3">
           Leader complete Review
@@ -57,46 +58,52 @@ export default function GoalCard({ goal, onDetailClick, onDeleteClick, onUpdateC
       )}
 
       <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-        Progress: {goal.progress}% <br/>
+        Progress: {goal.progress}% <br />
         Status: {goal.status}
       </p>
+      <p className="text-sm font-medium mb-2">
+        Health:
+        {health === "On Track" && <span className="text-green-600">🟢 On Track</span>}
+        {health === "At Risk" && <span className="text-orange-600">🟠 At Risk</span>}
+        {health === "High Risk" && <span className="text-red-600">🔴 High Risk</span>}
+      </p>
       <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 mb-4">
-        <div 
-          className={`h-2.5 rounded-full ${progressColor}`} 
+        <div
+          className={`h-2.5 rounded-full ${progressColor}`}
           style={{ width: `${goal.progress}%` }}
         ></div>
       </div>
-      
+
       <div className='flex justify-between gap-2'>
-          <button
-            onClick={() => onDetailClick(goal)}
-            className="flex items-center text-brand font-semibold hover:text-brand-dark transition duration-300 mt-2"
-          >
-            View details
-            <FaArrowRight className="ml-2 w-3 h-3 group-hover:translate-x-1 transition duration-200" />
-          </button>
+        <button
+          onClick={() => onDetailClick(goal)}
+          className="flex items-center text-brand font-semibold hover:text-brand-dark transition duration-300 mt-2"
+        >
+          View details
+          <FaArrowRight className="ml-2 w-3 h-3 group-hover:translate-x-1 transition duration-200" />
+        </button>
 
-          <div className='flex gap-1'>
-            {!goal.is_locked && goal.status === 'Not started' && (
-              <button
-                onClick={() => onDeleteClick(goal)}
-                className="flex items-end text-brand font-semibold hover:text-brand-dark transition duration-300 mt-2"
-              >
-                <FaTrash className="ml-2 w-3 h-3 group-hover:translate-x-1 transition duration-200" />
-              </button>
-            )}
+        <div className='flex gap-1'>
+          {!goal.is_locked && goal.status === 'Not started' && (
+            <button
+              onClick={() => onDeleteClick(goal)}
+              className="flex items-end text-brand font-semibold hover:text-brand-dark transition duration-300 mt-2"
+            >
+              <FaTrash className="ml-2 w-3 h-3 group-hover:translate-x-1 transition duration-200" />
+            </button>
+          )}
 
-            {!goal.is_locked && goal.status === 'Not started' && (
-              <button
-                onClick={() => onUpdateClick(goal)}
-                className="flex items-end text-brand font-semibold hover:text-brand-dark transition duration-300 mt-2"
-              >
-                <FaEdit className="ml-2 w-3 h-3 group-hover:translate-x-1 transition duration-200" />
-              </button>
-            )}
-          </div>
+          {!goal.is_locked && goal.status === 'Not started' && (
+            <button
+              onClick={() => onUpdateClick(goal)}
+              className="flex items-end text-brand font-semibold hover:text-brand-dark transition duration-300 mt-2"
+            >
+              <FaEdit className="ml-2 w-3 h-3 group-hover:translate-x-1 transition duration-200" />
+            </button>
+          )}
+        </div>
       </div>
-      
+
     </div>
   );
 }
