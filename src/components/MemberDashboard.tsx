@@ -64,6 +64,7 @@ export default function MemberDashboard() {
   useEffect(() => {
     const loadGoals = async () => {
       try {
+        if (!auth.token) return;
         const token = auth.token;
         const { result } = await apiFetchGoals(token);
         setGoals(result.data);
@@ -73,7 +74,7 @@ export default function MemberDashboard() {
     };
 
     loadGoals();
-  }, []);
+  }, [auth.token]);
 
   function validateCreateGoal() {
     const next: Record<string, string> = {};

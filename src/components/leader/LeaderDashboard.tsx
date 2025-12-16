@@ -26,11 +26,12 @@ export default function LeaderDashboard() {
 
   useEffect(() => {
     const fetchGoals = async () => {
+      if (!auth.token) return;
       const { result } = await fetchLeaderGoals(auth.token);
       setGoals(result.data);
     };
     fetchGoals();
-  }, []);
+  }, [auth.token]);
 
   const GOAL_STATUS_OPTIONS = ['All', 'Draft', 'In Progress', 'Completed', 'Cancelled', 'Not started'] as const;
   const REVIEW_STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'] as const;
