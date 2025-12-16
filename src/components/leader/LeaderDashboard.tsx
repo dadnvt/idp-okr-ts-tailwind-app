@@ -8,9 +8,11 @@ import StatsCard from '../StatsCard';
 import { useAuth } from '../../common/AuthContext';
 import LeaderGoalCard from './LeaderGoalCard';
 import { fetchLeaderGoals, reviewLeaderGoal } from '../../api/leaderApi';
+import { fetchLeaderUsers, type LeaderUser } from '../../api/usersApi';
 import Dropdown from '../Dropdown';
 import { endOfWeekMonday, parseDateOnly, startOfWeekMonday, toDateOnly } from '../../common/Utility';
 import { Button } from '../Button';
+import { YEAR_OPTIONS } from '../../common/constants';
 
 export default function LeaderDashboard() {
   const { auth } = useAuth();
@@ -19,19 +21,73 @@ export default function LeaderDashboard() {
   const [reviewGoal, setReviewGoal] = useState<IGoal | null>(null);
   const [goalStatusFilter, setGoalStatusFilter] = useState<string>('All');
   const [reviewStatusFilter, setReviewStatusFilter] = useState<string>('All');
-  const [memberQuery, setMemberQuery] = useState<string>('');
+  const [leaderUsers, setLeaderUsers] = useState<LeaderUser[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('All');
   const [teamFilter, setTeamFilter] = useState<string>('All');
   const [showInsights, setShowInsights] = useState(true);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [isLoadingGoals, setIsLoadingGoals] = useState(false);
+  const [hasMoreGoals, setHasMoreGoals] = useState(true);
+  const pageLimit = 10;
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      if (!auth.token) return;
+      try {
+        const { res, result } = await fetchLeaderUsers(auth.token, { limit: 500, offset: 0 });
+        if (!res.ok) throw new Error(result.error || 'Fetch users failed');
+        setLeaderUsers(result.data);
+      } catch (e) {
+        console.error(e);
+        setLeaderUsers([]);
+      }
+    };
+    loadUsers();
+  }, [auth.token]);
 
 
   useEffect(() => {
-    const fetchGoals = async () => {
+    const fetchFirstPage = async () => {
       if (!auth.token) return;
-      const { result } = await fetchLeaderGoals(auth.token);
-      setGoals(result.data);
+      setIsLoadingGoals(true);
+      try {
+        const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
+        const { result } = await fetchLeaderGoals(auth.token, {
+          year: selectedYear,
+          userId,
+          limit: pageLimit,
+          offset: 0,
+        });
+        setGoals(result.data);
+        setHasMoreGoals((result.data || []).length === pageLimit);
+      } finally {
+        setIsLoadingGoals(false);
+      }
     };
-    fetchGoals();
-  }, [auth.token]);
+    fetchFirstPage();
+  }, [auth.token, selectedYear, selectedUserId]);
+
+  const loadMoreGoals = async () => {
+    if (!auth.token) return;
+    if (isLoadingGoals) return;
+    if (!hasMoreGoals) return;
+    setIsLoadingGoals(true);
+    try {
+      const offset = goals.length;
+      const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
+      const { result } = await fetchLeaderGoals(auth.token, { year: selectedYear, userId, limit: pageLimit, offset });
+      const next = result.data || [];
+      setGoals((prev) => {
+        const seen = new Set(prev.map((g) => g.id));
+        const merged = [...prev];
+        for (const g of next) if (!seen.has(g.id)) merged.push(g);
+        return merged;
+      });
+      setHasMoreGoals(next.length === pageLimit);
+    } finally {
+      setIsLoadingGoals(false);
+    }
+  };
 
   const GOAL_STATUS_OPTIONS = ['All', 'Draft', 'In Progress', 'Completed', 'Cancelled', 'Not started'] as const;
   const REVIEW_STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'] as const;
@@ -56,12 +112,7 @@ export default function LeaderDashboard() {
 
   const visibleGoalsWithMemberTeam = visibleGoals
     .filter((g) => (teamFilter === 'All' ? true : (g.team || '') === teamFilter))
-    .filter((g) => {
-      const q = memberQuery.trim().toLowerCase();
-      if (!q) return true;
-      const hay = `${g.user_name || ''} ${g.user_email || ''} ${g.team || ''}`.toLowerCase();
-      return hay.includes(q);
-    });
+    ;
 
   const now = new Date();
   const todayStart = new Date(now);
@@ -104,6 +155,10 @@ export default function LeaderDashboard() {
       const planStatus = p.status || '';
       if (goalStatus !== 'In Progress') return [];
       if (!(planStatus === 'In Progress' || planStatus === 'Blocked')) return [];
+
+      // Direction B: weekly reports are no longer embedded in leader goals payload.
+      // Until we add a dedicated leader insight endpoint, we can't reliably compute this client-side.
+      if (!p.weekly_reports) return [];
 
       // Avoid flagging plans that start after last week ended
       if (p.start_date) {
@@ -392,6 +447,12 @@ export default function LeaderDashboard() {
 
         <div className="flex space-x-6 mb-6 flex-wrap gap-y-2">
           <Dropdown
+            label="Year"
+            value={selectedYear}
+            options={YEAR_OPTIONS}
+            onChange={(v) => setSelectedYear(Number(v))}
+          />
+          <Dropdown
             label="Goal Status"
             value={goalStatusFilter}
             options={[...GOAL_STATUS_OPTIONS]}
@@ -409,15 +470,18 @@ export default function LeaderDashboard() {
             options={[...TEAM_OPTIONS] as unknown as string[]}
             onChange={setTeamFilter}
           />
-          <div className="inline-block">
-            <label className="block text-sm font-semibold mb-1">Search (name/email)</label>
-            <input
-              value={memberQuery}
-              onChange={(e) => setMemberQuery(e.target.value)}
-              className="w-64 px-4 py-2 border rounded-lg"
-              placeholder="Jan / user@vinova.com.sg"
-            />
-          </div>
+          <Dropdown
+            label="Member"
+            value={selectedUserId}
+            options={[
+              { id: 'All', label: 'All members' },
+              ...leaderUsers.map((u) => ({
+                id: u.id,
+                label: `${u.name || u.email || u.id}${u.team ? ` • ${u.team}` : ''}`,
+              })),
+            ]}
+            onChange={(v) => setSelectedUserId(String(v))}
+          />
         </div>
 
         {/* Goals */}
@@ -429,6 +493,20 @@ export default function LeaderDashboard() {
               onReviewClick={setReviewGoal}
             />
           ))}
+        </div>
+
+        <div className="flex items-center justify-between mt-6">
+          <div className="text-xs text-gray-500">
+            Loaded: {goals.length} goals{isLoadingGoals ? ' (loading...)' : ''}
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!hasMoreGoals || isLoadingGoals}
+            onClick={loadMoreGoals}
+          >
+            {hasMoreGoals ? 'Load more' : 'No more'}
+          </Button>
         </div>
 
         {/* Detail modal */}

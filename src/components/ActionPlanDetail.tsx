@@ -1,17 +1,43 @@
-import { useMemo, useState } from "react";
-import type { IActionPlan } from "../types";
+import { useEffect, useMemo, useState } from "react";
+import type { IActionPlan, IWeeklyReport } from "../types";
+import { useAuth } from "../common/AuthContext";
+import { fetchWeeklyReportsByActionPlan } from "../api/weeklyReportsApi";
 import { Button } from "./Button";
 
 export function ActionPlanDetail({ plan }: { plan: IActionPlan }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { auth } = useAuth();
+  const [reports, setReports] = useState<IWeeklyReport[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const weeklyReports = useMemo(() => {
-    const list = plan.weekly_reports || [];
-    return [...list].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  }, [plan.weekly_reports]);
+    return [...reports].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }, [reports]);
 
   const visibleReports = useMemo(() => weeklyReports.slice(0, 3), [weeklyReports]);
   const hasMore = weeklyReports.length > visibleReports.length;
+
+  useEffect(() => {
+    const load = async () => {
+      if (!auth.token) return;
+      setIsLoading(true);
+      try {
+        // Fetch only first page; we display latest 3.
+        const { res, result } = await fetchWeeklyReportsByActionPlan(auth.token, plan.id, {
+          limit: 10,
+          offset: 0,
+        });
+        if (!res.ok) throw new Error(result.error || 'Fetch weekly reports failed');
+        setReports(result.data);
+      } catch (e) {
+        console.error(e);
+        setReports([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, [auth.token, plan.id]);
 
   return (
     <div className="space-y-4">
@@ -23,6 +49,9 @@ export function ActionPlanDetail({ plan }: { plan: IActionPlan }) {
         Weekly Reports <span className="text-sm text-gray-500">({weeklyReports.length})</span>
       </h4>
       <div className="space-y-3">
+        {isLoading && (
+          <p className="text-sm text-gray-400 italic">Loading weekly reports...</p>
+        )}
         {weeklyReports.length === 0 && (
           <p className="text-sm text-gray-400 italic">No weekly reports yet.</p>
         )}

@@ -7,6 +7,7 @@ type Role = 'member' | 'leader';
 
 interface AuthContextType {
   auth: AuthState;
+  isInitializing: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: null,
     },
   });
+  const [isInitializing, setIsInitializing] = useState(true);
 
 
   // LOGIN
@@ -77,13 +79,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
       } catch {
         // not logged in
+      } finally {
+        setIsInitializing(false);
       }
     };
     init();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ auth, login, logout }}>
+    <AuthContext.Provider value={{ auth, isInitializing, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

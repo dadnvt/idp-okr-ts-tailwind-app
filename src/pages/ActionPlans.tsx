@@ -49,8 +49,8 @@ export default function ActionPlansPage() {
       if (!token) return;
 
       if (auth.user?.role === 'leader') {
-        const { result } = await fetchLeaderGoals(token);
-        setGoals(result.data.filter((g) => g.year === selectedYear));
+        const { result } = await fetchLeaderGoals(token, { year: selectedYear, limit: 500, offset: 0 });
+        setGoals(result.data);
       } else {
         const { result } = await fetchActionPlansByYear(token, selectedYear);
         setGoals(result.data);
@@ -481,22 +481,8 @@ export default function ActionPlansPage() {
               const { res, result } = await createWeeklyReport(auth.token, createWeeklyForPlan.id, payload);
               if (!res.ok) throw new Error(result.error || 'Create weekly report failed');
 
-              setGoals((prev) =>
-                prev.map((g) => ({
-                  ...g,
-                  action_plans: g.action_plans?.map((p) =>
-                    p.id === createWeeklyForPlan.id
-                      ? { ...p, weekly_reports: [...(p.weekly_reports || []), result.data] }
-                      : p
-                  ),
-                }))
-              );
-
-              setSelectedPlan((p) =>
-                p && p.id === createWeeklyForPlan.id
-                  ? { ...p, weekly_reports: [...(p.weekly_reports || []), result.data] }
-                  : p
-              );
+              // Direction B: weekly reports are loaded lazily (per plan) so we don't keep them inside goal list state.
+              // We just close the modal; the detail view can refetch its first page if needed.
 
               setCreateWeeklyForPlan(null);
             }}

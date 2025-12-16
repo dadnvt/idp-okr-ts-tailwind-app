@@ -7,7 +7,7 @@ import { YEAR_OPTIONS } from '../common/constants';
 import { useAuth } from '../common/AuthContext';
 import { fetchActionPlansByYear } from '../api/actionPlansApi';
 import { fetchLeaderGoals } from '../api/leaderApi';
-import { createWeeklyReport } from '../api/weeklyReportsApi';
+import { createWeeklyReport, fetchWeeklyReportsByActionPlan } from '../api/weeklyReportsApi';
 import { Button } from '../components/Button';
 
 export default function WeeklyReportsPage() {
@@ -17,14 +17,17 @@ export default function WeeklyReportsPage() {
   const [goals, setGoals] = useState<IGoal[]>([]);
   const [selectedReport, setSelectedReport] = useState<IWeeklyReport | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedActionPlanId, setSelectedActionPlanId] = useState<string>('');
+  const [reports, setReports] = useState<IWeeklyReport[]>([]);
+  const [reportsOffset, setReportsOffset] = useState(0);
+  const reportsLimit = 20;
+  const [isLoadingReports, setIsLoadingReports] = useState(false);
 
   const allActionPlans: IActionPlan[] = useMemo(() => {
     return goals.flatMap((g) => g.action_plans || []);
   }, [goals]);
 
-  const allWeeklyReports: IWeeklyReport[] = useMemo(() => {
-    return allActionPlans.flatMap((p) => p.weekly_reports || []);
-  }, [allActionPlans]);
+  // Direction B: weekly reports are loaded lazily per action plan (paged).
 
   const [createForm, setCreateForm] = useState<{
     action_plan_id: string;
@@ -46,8 +49,8 @@ export default function WeeklyReportsPage() {
     const load = async () => {
       if (!auth.token) return;
       if (auth.user?.role === 'leader') {
-        const { result } = await fetchLeaderGoals(auth.token);
-        setGoals(result.data.filter((g) => g.year === selectedYear));
+        const { result } = await fetchLeaderGoals(auth.token, { year: selectedYear, limit: 500, offset: 0 });
+        setGoals(result.data);
       } else {
         const { result } = await fetchActionPlansByYear(auth.token, selectedYear);
         setGoals(result.data);
@@ -55,6 +58,42 @@ export default function WeeklyReportsPage() {
     };
     load();
   }, [auth.token, auth.user?.role, selectedYear]);
+
+  // Auto-select first action plan when the year/goals change
+  useEffect(() => {
+    if (!selectedActionPlanId && allActionPlans.length > 0) {
+      setSelectedActionPlanId(allActionPlans[0].id);
+      setReportsOffset(0);
+    }
+    if (allActionPlans.length === 0) {
+      setSelectedActionPlanId('');
+      setReports([]);
+      setReportsOffset(0);
+    }
+  }, [allActionPlans, selectedActionPlanId]);
+
+  // Load reports for selected action plan (paged)
+  useEffect(() => {
+    const loadReports = async () => {
+      if (!auth.token) return;
+      if (!selectedActionPlanId) return;
+      setIsLoadingReports(true);
+      try {
+        const { res, result } = await fetchWeeklyReportsByActionPlan(auth.token, selectedActionPlanId, {
+          limit: reportsLimit,
+          offset: reportsOffset,
+        });
+        if (!res.ok) throw new Error(result.error || 'Fetch weekly reports failed');
+        setReports(result.data);
+      } catch (e) {
+        console.error(e);
+        setReports([]);
+      } finally {
+        setIsLoadingReports(false);
+      }
+    };
+    loadReports();
+  }, [auth.token, selectedActionPlanId, reportsOffset]);
 
   const actionPlanOptions = allActionPlans.map((p) => ({
     id: p.id,
@@ -83,16 +122,9 @@ export default function WeeklyReportsPage() {
     const { res, result } = await createWeeklyReport(auth.token, plan.id, payload);
     if (!res.ok) return alert(result.error || 'Create weekly report failed');
 
-    setGoals((prev) =>
-      prev.map((g) => ({
-        ...g,
-        action_plans: g.action_plans?.map((p) =>
-          p.id === plan.id
-            ? { ...p, weekly_reports: [...(p.weekly_reports || []), result.data] }
-            : p
-        ),
-      }))
-    );
+    // Reload first page for the selected plan so the new report appears (sorted by date desc)
+    setSelectedActionPlanId(plan.id);
+    setReportsOffset(0);
 
     setIsCreateOpen(false);
     setCreateForm((f) => ({
@@ -127,6 +159,31 @@ export default function WeeklyReportsPage() {
         onClick={() => null}
       />
 
+        <div className="flex flex-wrap gap-4 items-end mb-4">
+          <div className="min-w-[280px]">
+            <label className="block text-sm font-medium mb-1">Action Plan</label>
+            <select
+              className="w-full border p-2 rounded"
+              value={selectedActionPlanId}
+              onChange={(e) => {
+                setSelectedActionPlanId(e.target.value);
+                setReportsOffset(0);
+              }}
+            >
+              {actionPlanOptions.length === 0 && <option value="">-- No action plans --</option>}
+              {actionPlanOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="text-xs text-gray-500">
+            Page size: {reportsLimit}
+          </div>
+        </div>
+
         <table className="w-full bg-white shadow rounded">
           <thead className="bg-gray-100">
             <tr>
@@ -139,7 +196,7 @@ export default function WeeklyReportsPage() {
             </tr>
           </thead>
           <tbody>
-            {allWeeklyReports.map((report) => (
+            {reports.map((report) => (
               <tr
                 key={report.id}
                 className="border-t hover:bg-gray-50 cursor-pointer"
@@ -155,15 +212,44 @@ export default function WeeklyReportsPage() {
                 <td className="p-3">{report.lead_feedback}</td>
               </tr>
             ))}
-            {allWeeklyReports.length === 0 && (
+            {!isLoadingReports && reports.length === 0 && (
               <tr>
                 <td className="p-3 text-gray-400 italic" colSpan={6}>
-                  No weekly reports yet.
+                  No weekly reports for this action plan.
+                </td>
+              </tr>
+            )}
+            {isLoadingReports && (
+              <tr>
+                <td className="p-3 text-gray-400 italic" colSpan={6}>
+                  Loading...
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+
+        <div className="flex items-center justify-between mt-4">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={reportsOffset === 0 || isLoadingReports}
+            onClick={() => setReportsOffset((o) => Math.max(0, o - reportsLimit))}
+          >
+            Prev
+          </Button>
+          <div className="text-xs text-gray-500">
+            Offset: {reportsOffset}
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={reports.length < reportsLimit || isLoadingReports}
+            onClick={() => setReportsOffset((o) => o + reportsLimit)}
+          >
+            Next
+          </Button>
+        </div>
 
       <Modal
         isOpen={!!selectedReport}

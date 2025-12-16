@@ -21,12 +21,15 @@ import {
   updateGoal as apiUpdateGoal,
 } from '../api/goalsApi';
 import { fetchLeaderGoals } from '../api/leaderApi';
+import { fetchLeaderUsers, type LeaderUser } from '../api/usersApi';
 
 export default function GoalsPage() {
   const years = YEAR_OPTIONS;
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [goalStatusFilter, setGoalStatusFilter] = useState<string>('All');
   const [reviewStatusFilter, setReviewStatusFilter] = useState<string>('All');
+  const [leaderUsers, setLeaderUsers] = useState<LeaderUser[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('All');
   const [detailGoal, setDetailGoal] = useState<IGoal | null>(null);
   const [isAddGoalOpen, setIsAddGoalOpen] = useState(false);
   const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
@@ -36,6 +39,10 @@ export default function GoalsPage() {
   const { auth } = useAuth();
   const { draft, setField, onDurationTypeChange, onStartDateChange, reset } = useGoalDraft();
   const isMember = auth.user?.role === 'member';
+  const isLeader = auth.user?.role === 'leader';
+  const [leaderIsLoading, setLeaderIsLoading] = useState(false);
+  const [leaderHasMore, setLeaderHasMore] = useState(true);
+  const leaderPageLimit = 10;
   const isProgressOnlyEdit = useMemo(() => {
     if (!editGoal) return false;
     if (!isMember) return false;
@@ -145,8 +152,17 @@ export default function GoalsPage() {
       try {
         const token = auth.token;
         if (auth.user?.role === 'leader') {
-          const { result } = await fetchLeaderGoals(token);
+          setLeaderIsLoading(true);
+          const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
+          const { result } = await fetchLeaderGoals(token, {
+            year: selectedYear,
+            userId,
+            limit: leaderPageLimit,
+            offset: 0,
+          });
           setGoals(result.data);
+          setLeaderHasMore((result.data || []).length === leaderPageLimit);
+          setLeaderIsLoading(false);
         } else {
           const { result } = await apiFetchGoals(token);
           setGoals(result.data);
@@ -158,10 +174,61 @@ export default function GoalsPage() {
     };
 
     loadGoals();
-  }, [auth.token, auth.user?.role]);
+  }, [auth.token, auth.user?.role, selectedYear, selectedUserId]);
+
+  // Leader: load users for dropdown filter (from users table)
+  useEffect(() => {
+    const loadUsers = async () => {
+      if (!isLeader) return;
+      if (!auth.token) return;
+      try {
+        const { res, result } = await fetchLeaderUsers(auth.token, { limit: 500, offset: 0 });
+        if (!res.ok) throw new Error(result.error || 'Fetch users failed');
+        setLeaderUsers(result.data);
+      } catch (e) {
+        console.error(e);
+        setLeaderUsers([]);
+      }
+    };
+    loadUsers();
+  }, [auth.token, isLeader]);
+
+  const loadMoreLeaderGoals = async () => {
+    if (!isLeader) return;
+    if (!auth.token) return;
+    if (leaderIsLoading) return;
+    if (!leaderHasMore) return;
+
+    setLeaderIsLoading(true);
+    try {
+      const offset = goals.length;
+      const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
+      const { result } = await fetchLeaderGoals(auth.token, {
+        year: selectedYear,
+        userId,
+        limit: leaderPageLimit,
+        offset,
+      });
+      const next = result.data || [];
+      setGoals((prev) => {
+        const seen = new Set(prev.map((g) => g.id));
+        const merged = [...prev];
+        for (const g of next) if (!seen.has(g.id)) merged.push(g);
+        return merged;
+      });
+      setLeaderHasMore(next.length === leaderPageLimit);
+    } finally {
+      setLeaderIsLoading(false);
+    }
+  };
 
   const filteredGoals = goals
     .filter((g) => g.year === Number(selectedYear))
+    .filter((g) => {
+      if (!isLeader) return true;
+      if (!selectedUserId || selectedUserId === 'All') return true;
+      return g.user_id === selectedUserId;
+    })
     .filter((g) => (goalStatusFilter === 'All' ? true : g.status === goalStatusFilter))
     .filter((g) =>
       reviewStatusFilter === 'All'
@@ -194,11 +261,27 @@ export default function GoalsPage() {
             options={[...REVIEW_STATUS_OPTIONS]}
             onChange={setReviewStatusFilter}
           />
+          {isLeader && (
+            <Dropdown
+              label="Member"
+              value={selectedUserId}
+              options={[
+                { id: 'All', label: 'All members' },
+                ...leaderUsers.map((u) => ({
+                  id: u.id,
+                  label: `${u.name || u.email || u.id}${u.team ? ` • ${u.team}` : ''}`,
+                })),
+              ]}
+              onChange={(v) => setSelectedUserId(String(v))}
+            />
+          )}
         </div>
 
-        <Button onClick={() => setIsAddGoalOpen(true)} variant="primary" className="mb-6">
-          + Add Goal
-        </Button>
+        {isMember && (
+          <Button onClick={() => setIsAddGoalOpen(true)} variant="primary" className="mb-6">
+            + Add Goal
+          </Button>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredGoals.map((goal) => (
@@ -212,6 +295,22 @@ export default function GoalsPage() {
             />
           ))}
         </div>
+
+        {isLeader && (
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-xs text-gray-500">
+              Loaded: {goals.length} goals{leaderIsLoading ? ' (loading...)' : ''}
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!leaderHasMore || leaderIsLoading}
+              onClick={loadMoreLeaderGoals}
+            >
+              {leaderHasMore ? 'Load more' : 'No more'}
+            </Button>
+          </div>
+        )}
 
         {editGoal && (
           <Modal

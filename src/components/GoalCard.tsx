@@ -18,6 +18,7 @@ export default function GoalCard({
   onUpdateClick,
   showActions = true,
 }: GoalCardProps) {
+  const memberLabel = goal.user_name || goal.user_email;
   const progressColor = goal.progress === 100 ? 'bg-green-500' : (goal.progress > 0 ? 'bg-brand' : 'bg-gray-300');
   const typeBg = goal.type === 'Hard' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800';
   const lateBg = new Date(goal.time_bound) < new Date() ? 'bg-red-100 text-red-800 font-bold' : '';
@@ -58,6 +59,14 @@ export default function GoalCard({
       <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 line-clamp-2">
         {goal.name}
       </h3>
+
+      {/* Leader view: show goal owner/member under the title for easier scanning */}
+      {!showActions && (
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          <span className="font-semibold">Member:</span> {memberLabel || '-'}
+          {goal.team ? <span className="text-gray-500"> • Team: {goal.team}</span> : null}
+        </p>
+      )}
 
       {goal.is_locked && (
         <div className="flex items-center text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-300 px-3 py-1 rounded-full w-fit mb-3">

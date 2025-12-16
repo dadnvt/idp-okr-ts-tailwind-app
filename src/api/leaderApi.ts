@@ -9,14 +9,25 @@ type ApiEnvelope<T> = { data: T; error?: string };
 // (module scope persists across StrictMode mount/unmount) so we only hit the server once.
 const inFlightLeaderGoals = new Map<string, Promise<{ res: Response; result: ApiEnvelope<IGoal[]> }>>();
 
-export async function fetchLeaderGoals(token: string | null) {
+export async function fetchLeaderGoals(
+  token: string | null,
+  params: { year?: number; userId?: string; limit?: number; offset?: number } = {}
+) {
+  const qs = new URLSearchParams();
+  if (typeof params.year === 'number') qs.set('year', String(params.year));
+  if (typeof params.userId === 'string' && params.userId.trim()) qs.set('user_id', params.userId.trim());
+  if (typeof params.limit === 'number') qs.set('limit', String(params.limit));
+  if (typeof params.offset === 'number') qs.set('offset', String(params.offset));
+  const path = qs.toString() ? `${API_PATHS.leaderGoals}?${qs.toString()}` : API_PATHS.leaderGoals;
+
   // Only dedupe when we have a stable token key.
-  if (token) {
+  if (token && !qs.toString()) {
+    // Only dedupe the "default" call (no params) to avoid cache poisoning between different pages/years.
     const existing = inFlightLeaderGoals.get(token);
     if (existing) return existing;
 
     const promise = (async () => {
-      const res = await apiFetch(API_PATHS.leaderGoals, {}, token);
+      const res = await apiFetch(path, {}, token);
       const result = (await res.json()) as ApiEnvelope<IGoal[]>;
       return { res, result };
     })();
@@ -29,7 +40,7 @@ export async function fetchLeaderGoals(token: string | null) {
     }
   }
 
-  const res = await apiFetch(API_PATHS.leaderGoals, {}, token);
+  const res = await apiFetch(path, {}, token);
   const result = (await res.json()) as ApiEnvelope<IGoal[]>;
   return { res, result };
 }
