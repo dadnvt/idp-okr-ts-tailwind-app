@@ -131,7 +131,7 @@ export default function ActionPlansPage() {
       setSelectedGoal(null);
     } catch (err) {
       console.error(err);
-      alert('Err Action Plan');
+      alert(err instanceof Error ? err.message : 'Create action plan failed');
     }
   };
 

@@ -54,7 +54,6 @@ export default function ReviewGoalModal({
       <Button
         onClick={() => onSubmit({ status, comment })}
         variant="success"
-        fullWidth
         className="mt-4"
       >
         Save

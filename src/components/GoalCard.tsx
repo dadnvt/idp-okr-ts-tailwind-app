@@ -1,5 +1,5 @@
 import { FaArrowRight, FaEdit, FaTrash } from 'react-icons/fa';
-import type { IActionPlan, IGoal } from '../types';
+import type { IGoal } from '../types';
 import { getGoalHealth, getHalfYearLabel, getQuarterFromDate } from '../common/Utility';
 import { Button } from './Button';
 
@@ -112,14 +112,22 @@ export default function GoalCard({
             </Button>
           )}
 
-          {showActions && !goal.is_locked && goal.status === 'Not started' && (
+          {showActions && goal.status !== 'Cancelled' && (
             <Button
               onClick={() => onUpdateClick(goal)}
               variant="ghost"
               size="sm"
-              className="flex items-end text-brand hover:text-brand-dark mt-2"
+              title={
+                goal.is_locked
+                  ? 'Goal is locked — progress updates are only allowed after leader approval'
+                  : 'Edit / Update progress'
+              }
+              className="flex items-center text-brand hover:text-brand-dark mt-2"
             >
-              <FaEdit className="ml-2 w-3 h-3 group-hover:translate-x-1 transition duration-200" />
+              <FaEdit className="w-3 h-3" />
+              <span className="ml-2 text-xs font-semibold">
+                {goal.status === 'Not started' && !goal.is_locked ? 'Edit' : 'Update progress'}
+              </span>
             </Button>
           )}
         </div>

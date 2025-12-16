@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import GoalCard from '../components/GoalCard';
 import Modal from '../common/Modal';
 import type { IGoal } from '../types';
@@ -9,6 +9,9 @@ import { YEAR_OPTIONS } from '../common/constants';
 import { GoalCreateFormFields } from '../components/goals/GoalCreateFormFields';
 import { useGoalDraft } from '../components/goals/useGoalDraft';
 import { Button } from '../components/Button';
+import { Input } from '../components/Input';
+import { DateInput } from '../components/DateInput';
+import { NumberInput } from '../components/NumberInput';
 import {
   createGoal,
   deleteGoal as apiDeleteGoal,
@@ -17,6 +20,7 @@ import {
   cancelGoalReview,
   updateGoal as apiUpdateGoal,
 } from '../api/goalsApi';
+import { fetchLeaderGoals } from '../api/leaderApi';
 
 export default function GoalsPage() {
   const years = YEAR_OPTIONS;
@@ -31,6 +35,13 @@ export default function GoalsPage() {
   const [goals , setGoals] = useState<IGoal[]>([]);
   const { auth } = useAuth();
   const { draft, setField, onDurationTypeChange, onStartDateChange, reset } = useGoalDraft();
+  const isMember = auth.user?.role === 'member';
+  const isProgressOnlyEdit = useMemo(() => {
+    if (!editGoal) return false;
+    if (!isMember) return false;
+    // Once a goal is started, member can update progress only (not other fields).
+    return editGoal.status !== 'Not started' || editGoal.is_locked;
+  }, [editGoal, isMember]);
 
   const GOAL_STATUS_OPTIONS = ['All', 'Draft', 'In Progress', 'Completed', 'Cancelled', 'Not started'] as const;
   const REVIEW_STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'] as const;
@@ -118,8 +129,11 @@ export default function GoalsPage() {
     e.preventDefault();
     try {
       if (!editGoal?.id) return;
-      const { result } = await apiUpdateGoal(auth.token, editGoal.id, editGoal);
-      setGoals(prev => prev.map(g => g.id === result.data.id ? result.data : g));
+      const payload = isProgressOnlyEdit ? { progress: editGoal.progress } : editGoal;
+      const { res, result } = await apiUpdateGoal(auth.token, editGoal.id, payload);
+      if (!res.ok) return alert(result.error || 'Update goal failed');
+      if (!result.data) return alert('Update goal failed');
+      setGoals((prev) => prev.map((g) => (g.id === result.data!.id ? result.data! : g)));
       setEditGoal(null);
     } catch (err) {
       console.error('Error updating goal:', err);
@@ -130,8 +144,13 @@ export default function GoalsPage() {
     const loadGoals = async () => {
       try {
         const token = auth.token;
-        const { result } = await apiFetchGoals(token);
-        setGoals(result.data);
+        if (auth.user?.role === 'leader') {
+          const { result } = await fetchLeaderGoals(token);
+          setGoals(result.data);
+        } else {
+          const { result } = await apiFetchGoals(token);
+          setGoals(result.data);
+        }
         setDetailGoal(null);
       } catch (err) {
         console.error('Error fetching goals:', err);
@@ -139,7 +158,7 @@ export default function GoalsPage() {
     };
 
     loadGoals();
-  }, [auth.token]);
+  }, [auth.token, auth.user?.role]);
 
   const filteredGoals = goals
     .filter((g) => g.year === Number(selectedYear))
@@ -197,23 +216,48 @@ export default function GoalsPage() {
         {editGoal && (
           <Modal
             isOpen={!!editGoal}
-            title="Edit Goal"
+            title={isProgressOnlyEdit ? 'Update Progress' : 'Edit Goal'}
             onClose={() => setEditGoal(null)}
           >
             <form className="space-y-4" onSubmit={handleUpdateGoal}>
-              <Input label="Goal Title" value={editGoal.name}
-                onChange={(val) => setEditGoal({ ...editGoal, name: val })} />
-              <Input label="Skill" value={editGoal.skill}
-                onChange={(val) => setEditGoal({ ...editGoal, skill: val })} />
-              <DateInput label="Start Date" value={editGoal.start_date}
-                onChange={(val) => setEditGoal({ ...editGoal, start_date: val })} />
-              <DateInput label="Deadline" value={editGoal.time_bound}
-                onChange={(val) => setEditGoal({ ...editGoal, time_bound: val })} />
-              <Dropdown label="Status" value={editGoal.status}
+              <Input
+                label="Goal Title"
+                value={editGoal.name}
+                disabled={isProgressOnlyEdit}
+                onChange={(val) => setEditGoal({ ...editGoal, name: val })}
+              />
+              <Input
+                label="Skill"
+                value={editGoal.skill}
+                disabled={isProgressOnlyEdit}
+                onChange={(val) => setEditGoal({ ...editGoal, skill: val })}
+              />
+              <DateInput
+                label="Start Date"
+                value={editGoal.start_date}
+                disabled={isProgressOnlyEdit}
+                onChange={(val) => setEditGoal({ ...editGoal, start_date: val })}
+              />
+              <DateInput
+                label="Deadline"
+                value={editGoal.time_bound}
+                disabled={isProgressOnlyEdit}
+                onChange={(val) => setEditGoal({ ...editGoal, time_bound: val })}
+              />
+              <Dropdown
+                label="Status"
+                value={editGoal.status}
+                disabled={isProgressOnlyEdit}
                 options={['Draft','In Progress','Completed','Cancelled','Not started']}
-                onChange={(val) => setEditGoal({ ...editGoal, status: val })} />
-              <NumberInput label="Progress (%)" value={editGoal.progress}
-                onChange={(val) => setEditGoal({ ...editGoal, progress: val })} />
+                onChange={(val) => setEditGoal({ ...editGoal, status: val })}
+              />
+              <NumberInput
+                label="Progress (%)"
+                value={editGoal.progress}
+                min={0}
+                max={100}
+                onChange={(val) => setEditGoal({ ...editGoal, progress: val })}
+              />
 
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="secondary" onClick={() => setEditGoal(null)}>

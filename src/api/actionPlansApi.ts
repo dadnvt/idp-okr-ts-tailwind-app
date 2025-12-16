@@ -3,6 +3,7 @@ import { apiFetch } from '../common/api';
 import { API_PATHS } from './paths';
 
 type ApiEnvelope<T> = { data: T; error?: string };
+type ApiErrorShape = { error?: string; message?: string };
 
 export async function fetchActionPlansByYear(token: string | null, year: number) {
   const res = await apiFetch(
@@ -14,7 +15,8 @@ export async function fetchActionPlansByYear(token: string | null, year: number)
     },
     token
   );
-  const result = (await res.json()) as ApiEnvelope<IGoal[]>;
+  const raw = (await res.json()) as ApiEnvelope<IGoal[]> & ApiErrorShape;
+  const result: ApiEnvelope<IGoal[]> = { data: raw.data ?? [], error: raw.error || raw.message };
   return { res, result };
 }
 
@@ -34,7 +36,11 @@ export async function createActionPlan(
     },
     token
   );
-  const result = (await res.json()) as ApiEnvelope<IActionPlan>;
+  const raw = (await res.json()) as ApiEnvelope<IActionPlan> & ApiErrorShape;
+  const result: ApiEnvelope<IActionPlan> = {
+    data: (raw.data ?? (null as unknown as IActionPlan)),
+    error: raw.error || raw.message,
+  };
   return { res, result };
 }
 
@@ -69,7 +75,11 @@ export async function requestActionPlanReview(token: string | null, actionPlanId
     },
     token
   );
-  const result = (await res.json()) as ApiEnvelope<IActionPlan>;
+  const raw = (await res.json()) as ApiEnvelope<IActionPlan> & ApiErrorShape;
+  const result: ApiEnvelope<IActionPlan> = {
+    data: (raw.data ?? (null as unknown as IActionPlan)),
+    error: raw.error || raw.message,
+  };
   return { res, result };
 }
 
@@ -84,7 +94,11 @@ export async function cancelActionPlanReview(token: string | null, actionPlanId:
     },
     token
   );
-  const result = (await res.json()) as ApiEnvelope<IActionPlan>;
+  const raw = (await res.json()) as ApiEnvelope<IActionPlan> & ApiErrorShape;
+  const result: ApiEnvelope<IActionPlan> = {
+    data: (raw.data ?? (null as unknown as IActionPlan)),
+    error: raw.error || raw.message,
+  };
   return { res, result };
 }
 

@@ -15,7 +15,8 @@ export async function fetchGoals(token: string | null) {
     },
     token
   );
-  const result = (await res.json()) as ApiEnvelope<IGoal[]>;
+  const raw = (await res.json()) as ApiEnvelope<IGoal[]> & ApiErrorShape;
+  const result: ApiEnvelope<IGoal[]> = { data: raw.data ?? [], error: raw.error || raw.message };
   return { res, result };
 }
 
@@ -31,7 +32,11 @@ export async function createGoal(token: string | null, payload: unknown) {
     },
     token
   );
-  const result = (await res.json()) as ApiEnvelope<IGoal>;
+  const raw = (await res.json()) as ApiEnvelope<IGoal> & ApiErrorShape;
+  const result: ApiEnvelope<IGoal> = {
+    data: (raw.data ?? (null as unknown as IGoal)),
+    error: raw.error || raw.message,
+  };
   return { res, result };
 }
 
@@ -47,7 +52,11 @@ export async function updateGoal(token: string | null, goalId: string, payload: 
     },
     token
   );
-  const result = (await res.json()) as ApiEnvelope<IGoal>;
+  const raw = (await res.json()) as ApiEnvelope<IGoal> & ApiErrorShape;
+  const result: ApiEnvelope<IGoal> = {
+    data: (raw.data ?? (null as unknown as IGoal)),
+    error: raw.error || raw.message,
+  };
   return { res, result };
 }
 

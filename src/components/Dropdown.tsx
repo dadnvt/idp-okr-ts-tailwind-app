@@ -5,6 +5,7 @@ interface DropdownProps<T extends string | number> {
   value: T;
   options: T[];
   onChange: (value: T) => void;
+  disabled?: boolean;
 }
 
 export default function Dropdown<T extends string | number>({
@@ -12,6 +13,7 @@ export default function Dropdown<T extends string | number>({
   value,
   options,
   onChange,
+  disabled,
 }: DropdownProps<T>) {
   return (
     <div className="relative inline-block w-40">
@@ -19,8 +21,9 @@ export default function Dropdown<T extends string | number>({
       <div className="relative">
         <select
           value={value}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value as T)}
-          className="appearance-none w-full px-4 py-2 pr-8 border rounded-lg"
+          className="appearance-none w-full px-4 py-2 pr-8 border rounded-lg disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {options.map((opt) => (
             <option key={opt} value={opt}>

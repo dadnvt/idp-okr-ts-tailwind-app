@@ -25,8 +25,8 @@ function AppContent() {
         </>
       ) : (
         <>
-          <Route path="/" element={<MemberDashboard onDetailClick={() => {}} />} />
-          <Route path="/dashboard" element={<MemberDashboard onDetailClick={() => {}} />} />
+          <Route path="/" element={<MemberDashboard />} />
+          <Route path="/dashboard" element={<MemberDashboard />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/action-plans" element={<ActionPlans />} />
           <Route path="/weekly-reports" element={<WeeklyReports />} />

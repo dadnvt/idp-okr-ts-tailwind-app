@@ -6,14 +6,6 @@ import type { SubmitHandler } from 'react-hook-form';
 import { FaPaperPlane, FaTimes } from 'react-icons/fa';
 import { Button } from './Button';
 
-// --- Giả định Action Plan (Dùng cho mock test) ---
-const mockActionPlan: IActionPlan = {
-  id: '1.2', goal_id: 'G1', activity: 'Chuẩn bị & trình bày demo ngắn trong mock meeting nội bộ với TL/PM', 
-  owner: 'Member', start_date: '2025-10-21', end_date: '2025-11-05', 
-  resources: '', expected_outcome: '≥2 lần mock meeting; TL/PM chấm điểm ≥B', 
-  status: 'In Progress', evidence_link: '' 
-};
-
 interface WeeklyReportFormProps {
     actionPlan: IActionPlan;
     onClose: () => void;
@@ -51,7 +43,7 @@ const WeeklyReportForm: React.FC<WeeklyReportFormProps> = ({ actionPlan, onClose
   // Custom Tailwind Input/Textarea component with error state
   const FormField: React.FC<{
       label: string; 
-      name: keyof IReportFormInput; 
+      name: keyof IReportFormInput & string; 
       isTextArea?: boolean; 
       isRequired?: boolean;
       rows?: number;

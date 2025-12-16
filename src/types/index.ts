@@ -68,8 +68,15 @@ export interface IWeeklyReport {
   lead_feedback: string;
 }
 
-interface IUser {
+export interface IUser {
   id: string;
   email: string;
   role: 'member' | 'leader';
+}
+
+export interface IReportFormInput {
+  work_done: string;
+  progress_update: string;
+  blockers_challenges?: string;
+  next_week_plan: string;
 }
