@@ -16,6 +16,7 @@ import {
   updateActionPlan,
 } from '../api/actionPlansApi';
 import { fetchLeaderGoals, reviewLeaderActionPlan } from '../api/leaderApi';
+import { fetchLeaderUsers, type LeaderUser } from '../api/usersApi';
 import ReviewActionPlanModal from '../components/leader/ReviewActionPlanModal';
 import WeeklyReportCreateModal from '../components/WeeklyReportCreateModal';
 import { createWeeklyReport } from '../api/weeklyReportsApi';
@@ -34,6 +35,8 @@ export default function ActionPlansPage() {
   const [editPlanEndDate, setEditPlanEndDate] = useState<string>('');
   const [goalStatusFilter, setGoalStatusFilter] = useState<string>('All');
   const [goalReviewFilter, setGoalReviewFilter] = useState<string>('All');
+  const [leaderUsers, setLeaderUsers] = useState<LeaderUser[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('All');
   const [planStatusFilter, setPlanStatusFilter] = useState<string>('All');
   const [planReviewFilter, setPlanReviewFilter] = useState<string>('All');
   const [query, setQuery] = useState<string>('');
@@ -49,7 +52,8 @@ export default function ActionPlansPage() {
       if (!token) return;
 
       if (auth.user?.role === 'leader') {
-        const { result } = await fetchLeaderGoals(token, { year: selectedYear, limit: 500, offset: 0 });
+        const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
+        const { result } = await fetchLeaderGoals(token, { year: selectedYear, userId, limit: 500, offset: 0 });
         setGoals(result.data);
       } else {
         const { result } = await fetchActionPlansByYear(token, selectedYear);
@@ -99,13 +103,30 @@ export default function ActionPlansPage() {
     if (!auth.token) return;
 
     // In React StrictMode (dev), effects can run twice on mount to surface side-effects.
-    // Dedupe identical fetches for the same (token, year) key.
-    const key = `${auth.token}:${selectedYear}`;
+    // Dedupe identical fetches for the same (token, year, member) key.
+    const key = `${auth.token}:${selectedYear}:${auth.user?.role === 'leader' ? selectedUserId : 'na'}`;
     if (lastFetchKeyRef.current === key) return;
     lastFetchKeyRef.current = key;
 
     fetchGoals();
-  }, [auth.token, selectedYear]);
+  }, [auth.token, auth.user?.role, selectedYear, selectedUserId]);
+
+  // Leader: load members for dropdown filter
+  useEffect(() => {
+    const loadUsers = async () => {
+      if (auth.user?.role !== 'leader') return;
+      if (!auth.token) return;
+      try {
+        const { res, result } = await fetchLeaderUsers(auth.token, { limit: 500, offset: 0 });
+        if (!res.ok) throw new Error(result.error || 'Fetch users failed');
+        setLeaderUsers(result.data);
+      } catch (e) {
+        console.error(e);
+        setLeaderUsers([]);
+      }
+    };
+    loadUsers();
+  }, [auth.token, auth.user?.role]);
 
   // Keep edit fields in sync with the currently opened plan
   useEffect(() => {
@@ -147,6 +168,20 @@ export default function ActionPlansPage() {
             options={years}
             onChange={setSelectedYear}
           />
+          {auth.user?.role === 'leader' && (
+            <Dropdown
+              label="Member"
+              value={selectedUserId}
+              options={[
+                { id: 'All', label: 'All members' },
+                ...leaderUsers.map((u) => ({
+                  id: u.id,
+                  label: `${u.name || u.email || u.id}${u.team ? ` • ${u.team}` : ''}`,
+                })),
+              ]}
+              onChange={(v) => setSelectedUserId(String(v))}
+            />
+          )}
           <Dropdown
             label="Goal Status"
             value={goalStatusFilter}
