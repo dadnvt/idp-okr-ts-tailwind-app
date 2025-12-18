@@ -43,11 +43,18 @@ export default function GoalsPage() {
   const [leaderIsLoading, setLeaderIsLoading] = useState(false);
   const [leaderHasMore, setLeaderHasMore] = useState(true);
   const leaderPageLimit = 10;
-  const isProgressOnlyEdit = useMemo(() => {
+  const isStatusProgressOnlyEdit = useMemo(() => {
     if (!editGoal) return false;
     if (!isMember) return false;
-    // Once a goal is started, member can update progress only (not other fields).
+    // Once a goal is started, member can update status + progress only (not other fields).
+    // Also: after leader approval (locked), still allow status/progress only.
     return editGoal.status !== 'Not started' || editGoal.is_locked;
+  }, [editGoal, isMember]);
+  const isFullyLockedForReview = useMemo(() => {
+    if (!editGoal) return false;
+    if (!isMember) return false;
+    // While Pending review, backend blocks all member edits.
+    return !!editGoal.is_locked && (editGoal.review_status || 'Pending') === 'Pending';
   }, [editGoal, isMember]);
 
   const GOAL_STATUS_OPTIONS = ['All', 'Draft', 'In Progress', 'Completed', 'Cancelled', 'Not started'] as const;
@@ -136,7 +143,9 @@ export default function GoalsPage() {
     e.preventDefault();
     try {
       if (!editGoal?.id) return;
-      const payload = isProgressOnlyEdit ? { progress: editGoal.progress } : editGoal;
+      const payload = isStatusProgressOnlyEdit
+        ? { progress: editGoal.progress, status: editGoal.status }
+        : editGoal;
       const { res, result } = await apiUpdateGoal(auth.token, editGoal.id, payload);
       if (!res.ok) return alert(result.error || 'Update goal failed');
       if (!result.data) return alert('Update goal failed');
@@ -315,38 +324,38 @@ export default function GoalsPage() {
         {editGoal && (
           <Modal
             isOpen={!!editGoal}
-            title={isProgressOnlyEdit ? 'Update Progress' : 'Edit Goal'}
+            title={isStatusProgressOnlyEdit ? 'Update Status & Progress' : 'Edit Goal'}
             onClose={() => setEditGoal(null)}
           >
             <form className="space-y-4" onSubmit={handleUpdateGoal}>
               <Input
                 label="Goal Title"
                 value={editGoal.name}
-                disabled={isProgressOnlyEdit}
+                disabled={isStatusProgressOnlyEdit || isFullyLockedForReview}
                 onChange={(val) => setEditGoal({ ...editGoal, name: val })}
               />
               <Input
                 label="Skill"
                 value={editGoal.skill}
-                disabled={isProgressOnlyEdit}
+                disabled={isStatusProgressOnlyEdit || isFullyLockedForReview}
                 onChange={(val) => setEditGoal({ ...editGoal, skill: val })}
               />
               <DateInput
                 label="Start Date"
                 value={editGoal.start_date}
-                disabled={isProgressOnlyEdit}
+                disabled={isStatusProgressOnlyEdit || isFullyLockedForReview}
                 onChange={(val) => setEditGoal({ ...editGoal, start_date: val })}
               />
               <DateInput
                 label="Deadline"
                 value={editGoal.time_bound}
-                disabled={isProgressOnlyEdit}
+                disabled={isStatusProgressOnlyEdit || isFullyLockedForReview}
                 onChange={(val) => setEditGoal({ ...editGoal, time_bound: val })}
               />
               <Dropdown
                 label="Status"
                 value={editGoal.status}
-                disabled={isProgressOnlyEdit}
+                disabled={isFullyLockedForReview}
                 options={['Draft','In Progress','Completed','Cancelled','Not started']}
                 onChange={(val) => setEditGoal({ ...editGoal, status: val })}
               />
@@ -355,7 +364,15 @@ export default function GoalsPage() {
                 value={editGoal.progress}
                 min={0}
                 max={100}
-                onChange={(val) => setEditGoal({ ...editGoal, progress: val })}
+                disabled={isFullyLockedForReview}
+                onChange={(val) => {
+                  const progress = Math.max(0, Math.min(100, Number(val)));
+                  setEditGoal({
+                    ...editGoal,
+                    progress,
+                    status: progress >= 100 ? 'Completed' : editGoal.status,
+                  });
+                }}
               />
 
               <div className="flex justify-end gap-3">
