@@ -1,8 +1,7 @@
 import { Button } from '../components/Button';
-import { API_BASE_URL } from '../common/api';
 
 export default function MaintenancePage(props: { onRetry?: () => void; lastError?: string | null }) {
-  const { onRetry, lastError } = props;
+  const { onRetry } = props;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
@@ -17,10 +16,6 @@ export default function MaintenancePage(props: { onRetry?: () => void; lastError
             Reload trang
           </Button>
         </div>
-
-        <p className="mt-6 text-xs text-gray-500">
-          Gợi ý: Nếu EC2 vừa bật lại, có thể cần 1–2 phút để service sẵn sàng.
-        </p>
       </div>
     </div>
   );
