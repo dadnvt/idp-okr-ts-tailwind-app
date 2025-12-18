@@ -25,7 +25,26 @@ export async function apiFetch(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  return fetch(buildApiUrl(path), { ...init, headers });
+  const url = buildApiUrl(path);
+  try {
+    const res = await fetch(url, { ...init, headers });
+
+    // If upstream is down, proxies often return 502/503/504.
+    // Emit a global signal so the app can show a maintenance screen.
+    if (res.status === 502 || res.status === 503 || res.status === 504) {
+      window.dispatchEvent(
+        new CustomEvent('api:unreachable', { detail: { path, url, status: res.status } })
+      );
+    }
+
+    return res;
+  } catch (err) {
+    // Network error / DNS / connection refused (EC2 down) -> fetch throws.
+    window.dispatchEvent(
+      new CustomEvent('api:unreachable', { detail: { path, url, error: String(err) } })
+    );
+    throw err;
+  }
 }
 
 

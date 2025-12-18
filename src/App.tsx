@@ -6,9 +6,68 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import ActionPlans from './pages/ActionPlans';
 import Goals from './pages/Goals';
 import WeeklyReports from './pages/WeeklyReports';
+import { buildApiUrl } from './common/api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import MaintenancePage from './pages/Maintenance';
 
 function AppContent() {
   const { auth, isInitializing } = useAuth();
+  const [apiDown, setApiDown] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+
+  const checkReachable = useCallback(async () => {
+    // Treat any successful HTTP response as "reachable" (even 401/403/404),
+    // and only treat network errors / 502/503/504 as "down".
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 4500);
+    try {
+      const res = await fetch(buildApiUrl('/healthz'), {
+        method: 'GET',
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+
+      const isBadGateway = res.status === 502 || res.status === 503 || res.status === 504;
+      if (isBadGateway) {
+        setApiDown(true);
+        setLastError(`Upstream returned ${res.status}`);
+        return;
+      }
+
+      // Reachable
+      setApiDown(false);
+      setLastError(null);
+    } catch (e) {
+      setApiDown(true);
+      setLastError(e instanceof Error ? e.message : String(e));
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }, []);
+
+  // Listen for global signals from apiFetch
+  useEffect(() => {
+    const onUnreachable = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as
+        | { path?: string; url?: string; status?: number; error?: string }
+        | undefined;
+      setApiDown(true);
+      if (detail?.status) setLastError(`Upstream returned ${detail.status} (${detail.path || ''})`);
+      else if (detail?.error) setLastError(detail.error);
+      else setLastError('API unreachable');
+    };
+    window.addEventListener('api:unreachable', onUnreachable);
+    return () => window.removeEventListener('api:unreachable', onUnreachable);
+  }, []);
+
+  // Periodic health probe (auto-recover when server is back)
+  useEffect(() => {
+    checkReachable();
+    const id = window.setInterval(checkReachable, 15000);
+    return () => window.clearInterval(id);
+  }, [checkReachable]);
+
+  const maintenance = useMemo(() => apiDown, [apiDown]);
 
   if (isInitializing) {
     return (
@@ -16,6 +75,10 @@ function AppContent() {
         Loading...
       </div>
     );
+  }
+
+  if (maintenance) {
+    return <MaintenancePage onRetry={checkReachable} lastError={lastError} />;
   }
 
   if (!auth.token) {
