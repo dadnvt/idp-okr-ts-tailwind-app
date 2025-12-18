@@ -14,6 +14,7 @@ function AppContent() {
   const { auth, isInitializing } = useAuth();
   const [apiDown, setApiDown] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [hasCheckedApiOnce, setHasCheckedApiOnce] = useState(false);
 
   const checkReachable = useCallback(async () => {
     // Treat any successful HTTP response as "reachable" (even 401/403/404),
@@ -42,6 +43,7 @@ function AppContent() {
       setLastError(e instanceof Error ? e.message : String(e));
     } finally {
       window.clearTimeout(timeout);
+      setHasCheckedApiOnce(true);
     }
   }, []);
 
@@ -73,6 +75,16 @@ function AppContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">
         Loading...
+      </div>
+    );
+  }
+
+  // Prevent "flash" of dashboard/routes before the first health check completes.
+  // If backend is down, we show Maintenance immediately after this.
+  if (!hasCheckedApiOnce) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">
+        Checking system status...
       </div>
     );
   }

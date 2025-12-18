@@ -10,10 +10,10 @@ export default function MaintenancePage(props: { onRetry?: () => void; lastError
 
         <div className="mt-6 flex items-center gap-3">
           <Button variant="primary" onClick={onRetry || (() => window.location.reload())}>
-            Thử lại
+            Try again
           </Button>
           <Button variant="secondary" onClick={() => window.location.reload()}>
-            Reload trang
+            Reload
           </Button>
         </div>
       </div>
