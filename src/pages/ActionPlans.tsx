@@ -44,7 +44,7 @@ export default function ActionPlansPage() {
 
   const GOAL_STATUS_OPTIONS = ['All', 'Draft', 'In Progress', 'Completed', 'Cancelled', 'Not started'] as const;
   const REVIEW_STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'] as const;
-  const PLAN_STATUS_OPTIONS = ['All', 'Not Started', 'In Progress', 'Completed', 'Blocked'] as const;
+  const PLAN_STATUS_OPTIONS = ['All', 'Not started', 'In Progress', 'Completed', 'Blocked'] as const;
 
   const fetchGoals = async () => {
     try {
@@ -347,7 +347,7 @@ export default function ActionPlansPage() {
                     <Dropdown
                       label="Status"
                       value={editPlanStatus}
-                      options={['Not Started', 'In Progress', 'Completed', 'Blocked']}
+                      options={['Not started', 'In Progress', 'Completed', 'Blocked']}
                       onChange={(v) => setEditPlanStatus(v as IActionPlan['status'])}
                     />
 
