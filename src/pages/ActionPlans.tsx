@@ -31,7 +31,7 @@ export default function ActionPlansPage() {
   const [selectedGoal, setSelectedGoal] = useState<IGoal | null>(null);
   const [reviewPlan, setReviewPlan] = useState<IActionPlan | null>(null);
   const [createWeeklyForPlan, setCreateWeeklyForPlan] = useState<IActionPlan | null>(null);
-  const [editPlanStatus, setEditPlanStatus] = useState<IActionPlan['status']>('Not Started');
+  const [editPlanStatus, setEditPlanStatus] = useState<IActionPlan['status']>('Not started');
   const [editPlanEndDate, setEditPlanEndDate] = useState<string>('');
   const [goalStatusFilter, setGoalStatusFilter] = useState<string>('All');
   const [goalReviewFilter, setGoalReviewFilter] = useState<string>('All');
@@ -220,113 +220,113 @@ export default function ActionPlansPage() {
         {/* Goals */}
         <div className="space-y-6">
           {filteredGoals.map(goal => {
-              const health = getGoalHealth(goal);
-              const visiblePlans =
-                (goal.action_plans || [])
-                  .filter((p) => (planStatusFilter === 'All' ? true : p.status === planStatusFilter))
-                  .filter((p) =>
-                    planReviewFilter === 'All'
-                      ? true
-                      : (p.review_status || 'Cancelled') === planReviewFilter
-                  )
-                  .filter((p) => {
-                    if (!q) return true;
-                    return `${p.activity || ''}`.toLowerCase().includes(q);
-                  });
-              return (
-                <div
-                  key={goal.id}
-                  className={`p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 
+            const health = getGoalHealth(goal);
+            const visiblePlans =
+              (goal.action_plans || [])
+                .filter((p) => (planStatusFilter === 'All' ? true : p.status === planStatusFilter))
+                .filter((p) =>
+                  planReviewFilter === 'All'
+                    ? true
+                    : (p.review_status || 'Cancelled') === planReviewFilter
+                )
+                .filter((p) => {
+                  if (!q) return true;
+                  return `${p.activity || ''}`.toLowerCase().includes(q);
+                });
+            return (
+              <div
+                key={goal.id}
+                className={`p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 
                               hover:shadow-2xl transition duration-300
                               ${goal.is_locked ? 'bg-red-50 dark:bg-red-900/20 border-red-300' : 'bg-white dark:bg-gray-800'}`}
-                >
-                  {/* Goal Header */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex flex-col gap-1">
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">{goal.name}</h3>
-                      <div className="flex gap-2 items-center">
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${goal.type === 'Hard' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800'}`}>
-                          {goal.type}
-                        </span>
-                        <span className="text-xs font-semibold px-2 py-1 rounded-full">
-                          {health === "On Track" && <span className="text-green-600">🟢 On Track</span>}
-                          {health === "At Risk" && <span className="text-orange-600">🟠 At Risk</span>}
-                          {health === "High Risk" && <span className="text-red-600">🔴 High Risk</span>}
-                        </span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">Deadline: {goal.time_bound}</span>
-                      </div>
+              >
+                {/* Goal Header */}
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex flex-col gap-1">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">{goal.name}</h3>
+                    <div className="flex gap-2 items-center">
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${goal.type === 'Hard' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800'}`}>
+                        {goal.type}
+                      </span>
+                      <span className="text-xs font-semibold px-2 py-1 rounded-full">
+                        {health === "On Track" && <span className="text-green-600">🟢 On Track</span>}
+                        {health === "At Risk" && <span className="text-orange-600">🟠 At Risk</span>}
+                        {health === "High Risk" && <span className="text-red-600">🔴 High Risk</span>}
+                      </span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Deadline: {goal.time_bound}</span>
                     </div>
-
-                    {auth.user?.role !== 'leader' && goal.status === 'Not started' && !goal.is_locked && (
-                      <Button onClick={() => setSelectedGoal(goal)} variant="primary">
-                        + Add Action Plan
-                      </Button>
-                    )}
                   </div>
 
-                  {/* Goal Status */}
-                  <div className="mb-4">
-                    {goal.is_locked && (
-                      <div className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-300 px-3 py-1 rounded-full w-fit mb-2">
-                        {goal.review_status === 'Pending'
-                          ? 'Review requested (locked)'
-                          : goal.review_status === 'Approved'
-                            ? 'Approved (locked)'
-                            : 'Locked'}
-                      </div>
-                    )}
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      <strong>Progress:</strong> {goal.progress}%<br />
-                      <strong>Status:</strong> {goal.status}
-                    </p>
-                  </div>
+                  {auth.user?.role !== 'leader' && goal.status === 'Not started' && !goal.is_locked && (
+                    <Button onClick={() => setSelectedGoal(goal)} variant="primary">
+                      + Add Action Plan
+                    </Button>
+                  )}
+                </div>
 
-                  {/* Action Plans */}
-                  <div className="mt-4">
-                    <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Action Plans</h4>
-                    <div className="space-y-3">
-                      {visiblePlans.map(plan => (
-                        <div
-                          key={plan.id}
-                          className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
-                          onClick={() => setSelectedPlan(plan)}
-                        >
-                          {(() => {
-                            const planHealth = getActionPlanHealth(plan);
-                            return (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                                Health:{' '}
-                                {planHealth === 'On Track' && <span className="text-green-600">🟢 On Track</span>}
-                                {planHealth === 'At Risk' && <span className="text-orange-600">🟠 At Risk</span>}
-                                {planHealth === 'High Risk' && <span className="text-red-600">🔴 High Risk</span>}
-                              </p>
-                            );
-                          })()}
-                          <h5 className="font-semibold text-gray-800 dark:text-white">{plan.activity}</h5>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Status: {plan.status} • Deadline: {plan.end_date}
+                {/* Goal Status */}
+                <div className="mb-4">
+                  {goal.is_locked && (
+                    <div className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-300 px-3 py-1 rounded-full w-fit mb-2">
+                      {goal.review_status === 'Pending'
+                        ? 'Review requested (locked)'
+                        : goal.review_status === 'Approved'
+                          ? 'Approved (locked)'
+                          : 'Locked'}
+                    </div>
+                  )}
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    <strong>Progress:</strong> {goal.progress}%<br />
+                    <strong>Status:</strong> {goal.status}
+                  </p>
+                </div>
+
+                {/* Action Plans */}
+                <div className="mt-4">
+                  <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Action Plans</h4>
+                  <div className="space-y-3">
+                    {visiblePlans.map(plan => (
+                      <div
+                        key={plan.id}
+                        className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
+                        onClick={() => setSelectedPlan(plan)}
+                      >
+                        {(() => {
+                          const planHealth = getActionPlanHealth(plan);
+                          return (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              Health:{' '}
+                              {planHealth === 'On Track' && <span className="text-green-600">🟢 On Track</span>}
+                              {planHealth === 'At Risk' && <span className="text-orange-600">🟠 At Risk</span>}
+                              {planHealth === 'High Risk' && <span className="text-red-600">🔴 High Risk</span>}
+                            </p>
+                          );
+                        })()}
+                        <h5 className="font-semibold text-gray-800 dark:text-white">{plan.activity}</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Status: {plan.status} • Deadline: {plan.end_date}
+                        </p>
+                        {plan.request_deadline_date && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            Requested deadline: <span className="font-semibold">{plan.request_deadline_date}</span>
+                            <span className="text-gray-500"> ({plan.deadline_change_count || 0}/3)</span>
                           </p>
-                          {plan.request_deadline_date && (
-                            <p className="text-xs text-blue-600 mt-1">
-                              Requested deadline: <span className="font-semibold">{plan.request_deadline_date}</span>
-                              <span className="text-gray-500"> ({plan.deadline_change_count || 0}/3)</span>
-                            </p>
-                          )}
-                          {(plan.review_status || plan.leader_review_notes) && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              Review: <span className="font-semibold">{plan.review_status ?? 'Pending'}</span>
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                      {visiblePlans.length === 0 && (
-                        <p className="text-sm text-gray-400 italic">No action plans yet.</p>
-                      )}
-                    </div>
+                        )}
+                        {(plan.review_status || plan.leader_review_notes) && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Review: <span className="font-semibold">{plan.review_status ?? 'Pending'}</span>
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    {visiblePlans.length === 0 && (
+                      <p className="text-sm text-gray-400 italic">No action plans yet.</p>
+                    )}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
         </div>
 
         {/* Action Plan Detail */}
