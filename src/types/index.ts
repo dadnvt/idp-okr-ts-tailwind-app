@@ -48,7 +48,7 @@ export interface IActionPlan {
   deadline_change_count?: number | null;
   resources: string;
   expected_outcome: string;
-  status: 'Not Started' | 'In Progress' | 'Completed' | 'Blocked';
+  status: 'Not started' | 'In Progress' | 'Completed' | 'Blocked';
   evidence_link: string; // Đường link bằng chứng/tài liệu
   weekly_reports?: IWeeklyReport[];
   is_locked?: boolean;
