@@ -7,7 +7,7 @@ import Sidebar from '../Sidebar';
 import StatsCard from '../StatsCard';
 import { useAuth } from '../../common/AuthContext';
 import LeaderGoalCard from './LeaderGoalCard';
-import { fetchLeaderGoals, reviewLeaderGoal } from '../../api/leaderApi';
+import { fetchLeaderGoals, fetchLeaderWeeklyReportStats, reviewLeaderGoal, type LeaderWeeklyReportStats } from '../../api/leaderApi';
 import { fetchLeaderUsers, type LeaderUser } from '../../api/usersApi';
 import Dropdown from '../Dropdown';
 import { endOfWeekMonday, parseDateOnly, startOfWeekMonday, toDateOnly } from '../../common/Utility';
@@ -28,6 +28,8 @@ export default function LeaderDashboard() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [isLoadingGoals, setIsLoadingGoals] = useState(false);
   const [hasMoreGoals, setHasMoreGoals] = useState(true);
+  const [weeklyReportStats, setWeeklyReportStats] = useState<LeaderWeeklyReportStats | null>(null);
+  const [isLoadingWeeklyStats, setIsLoadingWeeklyStats] = useState(false);
   const pageLimit = 10;
 
   useEffect(() => {
@@ -118,11 +120,37 @@ export default function LeaderDashboard() {
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
 
-  const lastWeekAnchor = new Date(now);
-  lastWeekAnchor.setDate(now.getDate() - 7);
-  const lastWeekStart = startOfWeekMonday(lastWeekAnchor);
-  const lastWeekEnd = endOfWeekMonday(lastWeekAnchor);
-  const lastWeekLabel = `${toDateOnly(lastWeekStart)} → ${toDateOnly(lastWeekEnd)}`;
+  // "This week" window (Mon → Sun) used for missing weekly report insight
+  const weekStart = startOfWeekMonday(now);
+  const weekEnd = endOfWeekMonday(now);
+  const weekFrom = toDateOnly(weekStart);
+  const weekTo = toDateOnly(weekEnd);
+  const weekLabel = `${toDateOnly(weekStart)} → ${toDateOnly(weekEnd)}`;
+
+  // Load weekly report stats for last week (leader insights)
+  useEffect(() => {
+    const load = async () => {
+      if (!auth.token) return;
+      setIsLoadingWeeklyStats(true);
+      try {
+        const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
+        const { res, result } = await fetchLeaderWeeklyReportStats(auth.token, {
+          year: selectedYear,
+          userId,
+          from: weekFrom,
+          to: weekTo,
+        });
+        if (!res.ok) throw new Error((result as any)?.error || 'Fetch weekly report stats failed');
+        setWeeklyReportStats(result.data || {});
+      } catch (e) {
+        console.error(e);
+        setWeeklyReportStats({});
+      } finally {
+        setIsLoadingWeeklyStats(false);
+      }
+    };
+    load();
+  }, [auth.token, selectedYear, selectedUserId, weekFrom, weekTo]);
 
   const overdueGoals = goals.filter((g) => {
     if (!g.time_bound) return false;
@@ -149,43 +177,31 @@ export default function LeaderDashboard() {
     })
   );
 
-  const missingWeeklyReportsLastWeek = goals.flatMap((g) =>
+  const missingWeeklyReportsThisWeek = goals.flatMap((g) =>
     (g.action_plans || []).flatMap((p) => {
       const goalStatus = g.status || '';
       const planStatus = p.status || '';
       if (goalStatus !== 'In Progress') return [];
       if (!(planStatus === 'In Progress' || planStatus === 'Blocked')) return [];
 
-      // Direction B: weekly reports are no longer embedded in leader goals payload.
-      // Until we add a dedicated leader insight endpoint, we can't reliably compute this client-side.
-      if (!p.weekly_reports) return [];
-
-      // Avoid flagging plans that start after last week ended
+      // Avoid flagging plans that start after this week ended
       if (p.start_date) {
         const start = parseDateOnly(p.start_date);
-        if (start.getTime() > lastWeekEnd.getTime()) return [];
+        if (start.getTime() > weekEnd.getTime()) return [];
       }
 
-      const reports = p.weekly_reports || [];
-      const hasReportLastWeek = reports.some((r) => {
-        if (!r.date) return false;
-        const d = parseDateOnly(r.date);
-        return d.getTime() >= lastWeekStart.getTime() && d.getTime() <= lastWeekEnd.getTime();
-      });
+      // Stats are fetched from backend (weekly_reports are not embedded in leader goals payload).
+      const stat = weeklyReportStats?.[p.id];
+      if (!stat) return [];
+      const hasReportThisWeek = stat.hasReportInRange;
 
-      if (hasReportLastWeek) return [];
-
-      const lastReportDate = reports
-        .map((r) => r.date)
-        .filter(Boolean)
-        .sort()
-        .at(-1);
+      if (hasReportThisWeek) return [];
 
       return [
         {
           goal: g,
           plan: p,
-          lastReportDate: lastReportDate || null,
+          lastReportDate: stat.lastReportDate || null,
         },
       ];
     })
@@ -253,9 +269,11 @@ export default function LeaderDashboard() {
                 <p className="text-2xl font-bold text-red-600">{overdueActionPlans.length}</p>
               </div>
               <div className="p-4 bg-white rounded-xl border">
-                <p className="text-sm text-gray-500">Missing weekly report (last week)</p>
-                <p className="text-xs text-gray-400">{lastWeekLabel}</p>
-                <p className="text-2xl font-bold text-orange-600">{missingWeeklyReportsLastWeek.length}</p>
+                <p className="text-sm text-gray-500">Missing weekly report (this week)</p>
+                <p className="text-xs text-gray-400">{weekLabel}</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {isLoadingWeeklyStats ? '…' : missingWeeklyReportsThisWeek.length}
+                </p>
               </div>
             </div>
           )}
@@ -313,8 +331,8 @@ export default function LeaderDashboard() {
 
               <div className="bg-white rounded-xl border overflow-hidden">
                 <div className="px-4 py-3 border-b">
-                  <h3 className="font-semibold">Missing weekly report (last week)</h3>
-                  <p className="text-xs text-gray-500">{lastWeekLabel}</p>
+                  <h3 className="font-semibold">Missing weekly report (this week)</h3>
+                  <p className="text-xs text-gray-500">{weekLabel}</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -329,7 +347,7 @@ export default function LeaderDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {missingWeeklyReportsLastWeek.slice(0, 10).map((x) => (
+                      {missingWeeklyReportsThisWeek.slice(0, 10).map((x) => (
                         <tr key={x.plan.id} className="border-t">
                           <td className="p-3">{x.goal.user_name || x.goal.user_email}</td>
                           <td className="p-3">{x.goal.team || '-'}</td>
@@ -339,7 +357,14 @@ export default function LeaderDashboard() {
                           <td className="p-3">{x.lastReportDate || 'Never'}</td>
                         </tr>
                       ))}
-                      {missingWeeklyReportsLastWeek.length === 0 && (
+                      {isLoadingWeeklyStats && (
+                        <tr>
+                          <td className="p-3 text-gray-500 italic" colSpan={6}>
+                            Loading weekly report stats…
+                          </td>
+                        </tr>
+                      )}
+                      {!isLoadingWeeklyStats && missingWeeklyReportsThisWeek.length === 0 && (
                         <tr>
                           <td className="p-3 text-gray-500 italic" colSpan={6}>
                             No missing reports detected.
@@ -349,9 +374,9 @@ export default function LeaderDashboard() {
                     </tbody>
                   </table>
                 </div>
-                {missingWeeklyReportsLastWeek.length > 10 && (
+                {missingWeeklyReportsThisWeek.length > 10 && (
                   <div className="px-4 py-3 text-xs text-gray-500 border-t">
-                    Showing 10/{missingWeeklyReportsLastWeek.length}. Narrow using Team/Search filters above.
+                    Showing 10/{missingWeeklyReportsThisWeek.length}. Narrow using Team/Search filters above.
                   </div>
                 )}
               </div>

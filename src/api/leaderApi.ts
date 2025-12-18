@@ -3,6 +3,10 @@ import { apiFetch } from '../common/api';
 import { API_PATHS } from './paths';
 
 type ApiEnvelope<T> = { data: T; error?: string };
+export type LeaderWeeklyReportStats = Record<
+  string,
+  { lastReportDate: string | null; hasReportInRange: boolean }
+>;
 
 // React 18 StrictMode (dev) intentionally mounts components twice to surface side effects.
 // That can lead to duplicate API calls from mount effects. We dedupe in-flight requests here
@@ -81,6 +85,25 @@ export async function reviewLeaderActionPlan(
     token
   );
   return { res };
+}
+
+export async function fetchLeaderWeeklyReportStats(
+  token: string | null,
+  params: { year: number; userId?: string; from: string; to: string }
+) {
+  const qs = new URLSearchParams();
+  qs.set('year', String(params.year));
+  qs.set('from', params.from);
+  qs.set('to', params.to);
+  if (typeof params.userId === 'string' && params.userId.trim()) qs.set('user_id', params.userId.trim());
+  const path = `${API_PATHS.leaderWeeklyReportStats}?${qs.toString()}`;
+
+  const res = await apiFetch(path, {}, token);
+  const result = (await res.json()) as ApiEnvelope<LeaderWeeklyReportStats> & {
+    meta?: unknown;
+    error?: string;
+  };
+  return { res, result };
 }
 
 
