@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { IActionPlan, IWeeklyReport } from "../types";
 import { useAuth } from "../common/AuthContext";
-import { fetchWeeklyReportsByActionPlan } from "../api/weeklyReportsApi";
+import { fetchWeeklyReportsByActionPlan, updateWeeklyReport } from "../api/weeklyReportsApi";
 import { Button } from "./Button";
 
 export function ActionPlanDetail({ plan }: { plan: IActionPlan }) {
@@ -9,6 +9,8 @@ export function ActionPlanDetail({ plan }: { plan: IActionPlan }) {
   const { auth } = useAuth();
   const [reports, setReports] = useState<IWeeklyReport[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const weeklyReports = useMemo(() => {
     return [...reports].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -58,6 +60,8 @@ export function ActionPlanDetail({ plan }: { plan: IActionPlan }) {
 
         {visibleReports.map((wr) => {
           const isExpanded = expandedId === wr.id;
+          const isLeader = auth.user?.role === 'leader';
+          const draft = feedbackDrafts[wr.id] ?? wr.lead_feedback ?? '';
           return (
             <div key={wr.id} className="border rounded p-3 bg-gray-50">
               <div className="flex items-start justify-between gap-3">
@@ -82,6 +86,49 @@ export function ActionPlanDetail({ plan }: { plan: IActionPlan }) {
                   <p><strong className="font-medium">Work done:</strong> {wr.work_done || '-'}</p>
                   <p><strong className="font-medium">Blockers:</strong> {wr.blockers_challenges || '-'}</p>
                   <p><strong className="font-medium">Next week plan:</strong> {wr.next_week_plan || '-'}</p>
+
+                  {isLeader && (
+                    <div className="pt-2 space-y-2">
+                      <label className="block text-sm font-medium">Update leader feedback</label>
+                      <textarea
+                        className="w-full border rounded p-2"
+                        rows={3}
+                        value={draft}
+                        onChange={(e) =>
+                          setFeedbackDrafts((prev) => ({ ...prev, [wr.id]: e.target.value }))
+                        }
+                      />
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          disabled={!auth.token || savingId === wr.id}
+                          onClick={async () => {
+                            if (!auth.token) return;
+                            setSavingId(wr.id);
+                            try {
+                              const { res, result } = await updateWeeklyReport(auth.token, wr.id, {
+                                lead_feedback: draft,
+                              });
+                              if (!res.ok) throw new Error((result as any)?.error || 'Update failed');
+                              // Refresh local list
+                              setReports((prev) =>
+                                prev.map((r) => (r.id === wr.id ? { ...r, lead_feedback: draft } : r))
+                              );
+                            } catch (e) {
+                              console.error(e);
+                              alert(e instanceof Error ? e.message : 'Update failed');
+                            } finally {
+                              setSavingId(null);
+                            }
+                          }}
+                        >
+                          {savingId === wr.id ? 'Saving...' : 'Save feedback'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

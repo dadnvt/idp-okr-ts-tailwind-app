@@ -17,6 +17,7 @@ import {
 } from '../api/actionPlansApi';
 import { fetchLeaderGoals, reviewLeaderActionPlan } from '../api/leaderApi';
 import { fetchLeaderUsers, type LeaderUser } from '../api/usersApi';
+import { fetchLeaderTeams, type LeaderTeam } from '../api/teamsApi';
 import ReviewActionPlanModal from '../components/leader/ReviewActionPlanModal';
 import WeeklyReportCreateModal from '../components/WeeklyReportCreateModal';
 import { createWeeklyReport } from '../api/weeklyReportsApi';
@@ -35,6 +36,8 @@ export default function ActionPlansPage() {
   const [editPlanEndDate, setEditPlanEndDate] = useState<string>('');
   const [goalStatusFilter, setGoalStatusFilter] = useState<string>('All');
   const [goalReviewFilter, setGoalReviewFilter] = useState<string>('All');
+  const [teams, setTeams] = useState<LeaderTeam[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('All');
   const [leaderUsers, setLeaderUsers] = useState<LeaderUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('All');
   const [planStatusFilter, setPlanStatusFilter] = useState<string>('All');
@@ -53,7 +56,8 @@ export default function ActionPlansPage() {
 
       if (auth.user?.role === 'leader') {
         const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
-        const { result } = await fetchLeaderGoals(token, { year: selectedYear, userId, limit: 500, offset: 0 });
+        const teamId = selectedTeamId !== 'All' ? selectedTeamId : undefined;
+        const { result } = await fetchLeaderGoals(token, { year: selectedYear, userId, teamId, limit: 500, offset: 0 });
         setGoals(result.data);
       } else {
         const { result } = await fetchActionPlansByYear(token, selectedYear);
@@ -103,30 +107,55 @@ export default function ActionPlansPage() {
     if (!auth.token) return;
 
     // In React StrictMode (dev), effects can run twice on mount to surface side-effects.
-    // Dedupe identical fetches for the same (token, year, member) key.
-    const key = `${auth.token}:${selectedYear}:${auth.user?.role === 'leader' ? selectedUserId : 'na'}`;
+    // Dedupe identical fetches for the same (token, year, team, member) key.
+    const key = `${auth.token}:${selectedYear}:${auth.user?.role === 'leader' ? `${selectedTeamId}:${selectedUserId}` : 'na'}`;
     if (lastFetchKeyRef.current === key) return;
     lastFetchKeyRef.current = key;
 
     fetchGoals();
-  }, [auth.token, auth.user?.role, selectedYear, selectedUserId]);
+  }, [auth.token, auth.user?.role, selectedYear, selectedUserId, selectedTeamId]);
 
-  // Leader: load members for dropdown filter
+  // Leader: load teams for dropdown filter
+  useEffect(() => {
+    const loadTeams = async () => {
+      if (auth.user?.role !== 'leader') return;
+      if (!auth.token) return;
+      try {
+        const { res, result } = await fetchLeaderTeams(auth.token);
+        if (!res.ok) throw new Error(result.error || 'Fetch teams failed');
+        setTeams(result.data);
+      } catch (e) {
+        console.error(e);
+        setTeams([]);
+      }
+    };
+    loadTeams();
+  }, [auth.token, auth.user?.role]);
+
+  // Leader: load members for dropdown filter (filtered by team)
   useEffect(() => {
     const loadUsers = async () => {
       if (auth.user?.role !== 'leader') return;
       if (!auth.token) return;
       try {
-        const { res, result } = await fetchLeaderUsers(auth.token, { limit: 500, offset: 0 });
+        const teamId = selectedTeamId !== 'All' ? selectedTeamId : undefined;
+        const { res, result } = await fetchLeaderUsers(auth.token, { teamId, limit: 500, offset: 0 });
         if (!res.ok) throw new Error(result.error || 'Fetch users failed');
-        setLeaderUsers(result.data);
+        const users = result.data || [];
+        setLeaderUsers(users);
+
+        if (selectedUserId !== 'All') {
+          const exists = users.some((u) => u.id === selectedUserId);
+          if (!exists) setSelectedUserId('All');
+        }
       } catch (e) {
         console.error(e);
         setLeaderUsers([]);
+        if (selectedUserId !== 'All') setSelectedUserId('All');
       }
     };
     loadUsers();
-  }, [auth.token, auth.user?.role]);
+  }, [auth.token, auth.user?.role, selectedTeamId, selectedUserId]);
 
   // Keep edit fields in sync with the currently opened plan
   useEffect(() => {
@@ -169,18 +198,29 @@ export default function ActionPlansPage() {
             onChange={setSelectedYear}
           />
           {auth.user?.role === 'leader' && (
-            <Dropdown
-              label="Member"
-              value={selectedUserId}
-              options={[
-                { id: 'All', label: 'All members' },
-                ...leaderUsers.map((u) => ({
-                  id: u.id,
-                  label: `${u.name || u.email || u.id}${u.team ? ` • ${u.team}` : ''}`,
-                })),
-              ]}
-              onChange={(v) => setSelectedUserId(String(v))}
-            />
+            <>
+              <Dropdown
+                label="Team"
+                value={selectedTeamId}
+                options={[
+                  { id: 'All', label: 'All teams' },
+                  ...teams.map((t) => ({ id: t.id, label: t.name })),
+                ]}
+                onChange={(v) => setSelectedTeamId(String(v))}
+              />
+              <Dropdown
+                label="Member"
+                value={selectedUserId}
+                options={[
+                  { id: 'All', label: 'All members' },
+                  ...leaderUsers.map((u) => ({
+                    id: u.id,
+                    label: `${u.name || u.email || u.id}`,
+                  })),
+                ]}
+                onChange={(v) => setSelectedUserId(String(v))}
+              />
+            </>
           )}
           <Dropdown
             label="Goal Status"

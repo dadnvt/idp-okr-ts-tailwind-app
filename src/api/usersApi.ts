@@ -7,17 +7,18 @@ export type LeaderUser = {
   id: string;
   email?: string | null;
   name?: string | null;
-  team?: string | null;
+  team_id?: string | null;
+  team_name?: string | null;
   role?: string | null;
 };
 
 export async function fetchLeaderUsers(
   token: string | null,
-  params: { q?: string; team?: string; limit?: number; offset?: number } = {}
+  params: { q?: string; teamId?: string; limit?: number; offset?: number } = {}
 ) {
   const qs = new URLSearchParams();
   if (params.q) qs.set('q', params.q);
-  if (params.team) qs.set('team', params.team);
+  if (params.teamId) qs.set('team_id', params.teamId);
   if (typeof params.limit === 'number') qs.set('limit', String(params.limit));
   if (typeof params.offset === 'number') qs.set('offset', String(params.offset));
 

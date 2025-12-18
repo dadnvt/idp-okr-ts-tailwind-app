@@ -22,12 +22,15 @@ import {
 } from '../api/goalsApi';
 import { fetchLeaderGoals } from '../api/leaderApi';
 import { fetchLeaderUsers, type LeaderUser } from '../api/usersApi';
+import { fetchLeaderTeams, type LeaderTeam } from '../api/teamsApi';
 
 export default function GoalsPage() {
   const years = YEAR_OPTIONS;
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [goalStatusFilter, setGoalStatusFilter] = useState<string>('All');
   const [reviewStatusFilter, setReviewStatusFilter] = useState<string>('All');
+  const [teams, setTeams] = useState<LeaderTeam[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('All');
   const [leaderUsers, setLeaderUsers] = useState<LeaderUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('All');
   const [detailGoal, setDetailGoal] = useState<IGoal | null>(null);
@@ -90,9 +93,6 @@ export default function GoalsPage() {
 
       const newGoal = {
         user_id: userId,
-        user_email: auth.user?.email,
-        user_name: auth.user?.name,
-        team: auth.user?.team || '',
         year: new Date().getFullYear(),
         name: draft.name,
         type: draft.type,
@@ -163,9 +163,11 @@ export default function GoalsPage() {
         if (auth.user?.role === 'leader') {
           setLeaderIsLoading(true);
           const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
+          const teamId = selectedTeamId !== 'All' ? selectedTeamId : undefined;
           const { result } = await fetchLeaderGoals(token, {
             year: selectedYear,
             userId,
+            teamId,
             limit: leaderPageLimit,
             offset: 0,
           });
@@ -183,7 +185,7 @@ export default function GoalsPage() {
     };
 
     loadGoals();
-  }, [auth.token, auth.user?.role, selectedYear, selectedUserId]);
+  }, [auth.token, auth.user?.role, selectedYear, selectedUserId, selectedTeamId]);
 
   // Leader: load users for dropdown filter (from users table)
   useEffect(() => {
@@ -191,15 +193,41 @@ export default function GoalsPage() {
       if (!isLeader) return;
       if (!auth.token) return;
       try {
-        const { res, result } = await fetchLeaderUsers(auth.token, { limit: 500, offset: 0 });
+        const teamId = selectedTeamId !== 'All' ? selectedTeamId : undefined;
+        const { res, result } = await fetchLeaderUsers(auth.token, { teamId, limit: 500, offset: 0 });
         if (!res.ok) throw new Error(result.error || 'Fetch users failed');
-        setLeaderUsers(result.data);
+        const users = result.data || [];
+        setLeaderUsers(users);
+
+        // If current selected member isn't in this team, reset to All.
+        if (selectedUserId !== 'All') {
+          const exists = users.some((u) => u.id === selectedUserId);
+          if (!exists) setSelectedUserId('All');
+        }
       } catch (e) {
         console.error(e);
         setLeaderUsers([]);
+        if (selectedUserId !== 'All') setSelectedUserId('All');
       }
     };
     loadUsers();
+  }, [auth.token, isLeader, selectedTeamId, selectedUserId]);
+
+  // Leader: load teams for dropdown filter
+  useEffect(() => {
+    const loadTeams = async () => {
+      if (!isLeader) return;
+      if (!auth.token) return;
+      try {
+        const { res, result } = await fetchLeaderTeams(auth.token);
+        if (!res.ok) throw new Error(result.error || 'Fetch teams failed');
+        setTeams(result.data);
+      } catch (e) {
+        console.error(e);
+        setTeams([]);
+      }
+    };
+    loadTeams();
   }, [auth.token, isLeader]);
 
   const loadMoreLeaderGoals = async () => {
@@ -212,9 +240,11 @@ export default function GoalsPage() {
     try {
       const offset = goals.length;
       const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
+      const teamId = selectedTeamId !== 'All' ? selectedTeamId : undefined;
       const { result } = await fetchLeaderGoals(auth.token, {
         year: selectedYear,
         userId,
+        teamId,
         limit: leaderPageLimit,
         offset,
       });
@@ -271,18 +301,29 @@ export default function GoalsPage() {
             onChange={setReviewStatusFilter}
           />
           {isLeader && (
-            <Dropdown
-              label="Member"
-              value={selectedUserId}
-              options={[
-                { id: 'All', label: 'All members' },
-                ...leaderUsers.map((u) => ({
-                  id: u.id,
-                  label: `${u.name || u.email || u.id}${u.team ? ` • ${u.team}` : ''}`,
-                })),
-              ]}
-              onChange={(v) => setSelectedUserId(String(v))}
-            />
+            <>
+              <Dropdown
+                label="Team"
+                value={selectedTeamId}
+                options={[
+                  { id: 'All', label: 'All teams' },
+                  ...teams.map((t) => ({ id: t.id, label: t.name })),
+                ]}
+                onChange={(v) => setSelectedTeamId(String(v))}
+              />
+              <Dropdown
+                label="Member"
+                value={selectedUserId}
+                options={[
+                  { id: 'All', label: 'All members' },
+                  ...leaderUsers.map((u) => ({
+                    id: u.id,
+                    label: `${u.name || u.email || u.id}`,
+                  })),
+                ]}
+                onChange={(v) => setSelectedUserId(String(v))}
+              />
+            </>
           )}
         </div>
 

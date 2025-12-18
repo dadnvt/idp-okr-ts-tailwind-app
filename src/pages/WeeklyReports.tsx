@@ -7,7 +7,7 @@ import { YEAR_OPTIONS } from '../common/constants';
 import { useAuth } from '../common/AuthContext';
 import { fetchActionPlansByYear } from '../api/actionPlansApi';
 import { fetchLeaderGoals } from '../api/leaderApi';
-import { createWeeklyReport, fetchWeeklyReportsByActionPlan } from '../api/weeklyReportsApi';
+import { createWeeklyReport, fetchWeeklyReportsByActionPlan, updateWeeklyReport } from '../api/weeklyReportsApi';
 import { Button } from '../components/Button';
 
 export default function WeeklyReportsPage() {
@@ -16,6 +16,7 @@ export default function WeeklyReportsPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [goals, setGoals] = useState<IGoal[]>([]);
   const [selectedReport, setSelectedReport] = useState<IWeeklyReport | null>(null);
+  const [leaderFeedbackDraft, setLeaderFeedbackDraft] = useState<string>('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedActionPlanId, setSelectedActionPlanId] = useState<string>('');
   const [reports, setReports] = useState<IWeeklyReport[]>([]);
@@ -58,6 +59,14 @@ export default function WeeklyReportsPage() {
     };
     load();
   }, [auth.token, auth.user?.role, selectedYear]);
+
+  useEffect(() => {
+    if (!selectedReport) {
+      setLeaderFeedbackDraft('');
+      return;
+    }
+    setLeaderFeedbackDraft(selectedReport.lead_feedback || '');
+  }, [selectedReport]);
 
   // Auto-select first action plan when the year/goals change
   useEffect(() => {
@@ -263,7 +272,43 @@ export default function WeeklyReportsPage() {
             <p><strong>Công việc đã hoàn thành:</strong> {selectedReport.work_done || 'Chưa cập nhật'}</p>
             <p><strong>Blockers/Vấn đề:</strong> {selectedReport.blockers_challenges}</p>
             <p><strong>Kế hoạch tuần tới:</strong> {selectedReport.next_week_plan}</p>
-            <p><strong>Feedback Leader:</strong> {selectedReport.lead_feedback}</p>
+            {auth.user?.role === 'leader' ? (
+              <div className="space-y-2 pt-2">
+                <label className="block text-sm font-medium">Feedback Leader</label>
+                <textarea
+                  className="w-full border rounded p-2"
+                  rows={3}
+                  value={leaderFeedbackDraft}
+                  onChange={(e) => setLeaderFeedbackDraft(e.target.value)}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    variant="primary"
+                    onClick={async () => {
+                      if (!auth.token) return;
+                      const { res } = await updateWeeklyReport(auth.token, selectedReport.id, {
+                        lead_feedback: leaderFeedbackDraft,
+                      });
+                      if (!res.ok) return alert('Update feedback failed');
+
+                      // Update list cache
+                      setReports((prev) =>
+                        prev.map((r) =>
+                          r.id === selectedReport.id ? { ...r, lead_feedback: leaderFeedbackDraft } : r
+                        )
+                      );
+                      setSelectedReport((prev) =>
+                        prev && prev.id === selectedReport.id ? { ...prev, lead_feedback: leaderFeedbackDraft } : prev
+                      );
+                    }}
+                  >
+                    Save feedback
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p><strong>Feedback Leader:</strong> {selectedReport.lead_feedback}</p>
+            )}
           </div>
         ) : null}
       </Modal>

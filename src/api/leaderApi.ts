@@ -15,11 +15,12 @@ const inFlightLeaderGoals = new Map<string, Promise<{ res: Response; result: Api
 
 export async function fetchLeaderGoals(
   token: string | null,
-  params: { year?: number; userId?: string; limit?: number; offset?: number } = {}
+  params: { year?: number; userId?: string; teamId?: string; limit?: number; offset?: number } = {}
 ) {
   const qs = new URLSearchParams();
   if (typeof params.year === 'number') qs.set('year', String(params.year));
   if (typeof params.userId === 'string' && params.userId.trim()) qs.set('user_id', params.userId.trim());
+  if (typeof params.teamId === 'string' && params.teamId.trim()) qs.set('team_id', params.teamId.trim());
   if (typeof params.limit === 'number') qs.set('limit', String(params.limit));
   if (typeof params.offset === 'number') qs.set('offset', String(params.offset));
   const path = qs.toString() ? `${API_PATHS.leaderGoals}?${qs.toString()}` : API_PATHS.leaderGoals;

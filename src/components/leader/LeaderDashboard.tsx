@@ -9,6 +9,8 @@ import { useAuth } from '../../common/AuthContext';
 import LeaderGoalCard from './LeaderGoalCard';
 import { fetchLeaderGoals, fetchLeaderWeeklyReportStats, reviewLeaderGoal, type LeaderWeeklyReportStats } from '../../api/leaderApi';
 import { fetchLeaderUsers, type LeaderUser } from '../../api/usersApi';
+import { fetchLeaderMemberInsights, type LeaderMemberInsights } from '../../api/leaderInsightsApi';
+import { fetchLeaderTeams, type LeaderTeam } from '../../api/teamsApi';
 import Dropdown from '../Dropdown';
 import { endOfWeekMonday, parseDateOnly, startOfWeekMonday, toDateOnly } from '../../common/Utility';
 import { Button } from '../Button';
@@ -23,28 +25,60 @@ export default function LeaderDashboard() {
   const [reviewStatusFilter, setReviewStatusFilter] = useState<string>('All');
   const [leaderUsers, setLeaderUsers] = useState<LeaderUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('All');
-  const [teamFilter, setTeamFilter] = useState<string>('All');
+  const [teams, setTeams] = useState<LeaderTeam[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('All');
   const [showInsights, setShowInsights] = useState(true);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [isLoadingGoals, setIsLoadingGoals] = useState(false);
   const [hasMoreGoals, setHasMoreGoals] = useState(true);
   const [weeklyReportStats, setWeeklyReportStats] = useState<LeaderWeeklyReportStats | null>(null);
   const [isLoadingWeeklyStats, setIsLoadingWeeklyStats] = useState(false);
+  const [memberInsights, setMemberInsights] = useState<LeaderMemberInsights | null>(null);
+  const [isLoadingInsights, setIsLoadingInsights] = useState(false);
   const pageLimit = 10;
 
   useEffect(() => {
     const loadUsers = async () => {
       if (!auth.token) return;
       try {
-        const { res, result } = await fetchLeaderUsers(auth.token, { limit: 500, offset: 0 });
+        const teamId = selectedTeamId !== 'All' ? selectedTeamId : undefined;
+        const { res, result } = await fetchLeaderUsers(auth.token, {
+          teamId,
+          limit: 500,
+          offset: 0,
+        });
         if (!res.ok) throw new Error(result.error || 'Fetch users failed');
-        setLeaderUsers(result.data);
+
+        const users = result.data || [];
+        setLeaderUsers(users);
+
+        // If current selected member is not in the filtered team user list, reset to All.
+        if (selectedUserId !== 'All') {
+          const exists = users.some((u) => u.id === selectedUserId);
+          if (!exists) setSelectedUserId('All');
+        }
       } catch (e) {
         console.error(e);
         setLeaderUsers([]);
+        if (selectedUserId !== 'All') setSelectedUserId('All');
       }
     };
     loadUsers();
+  }, [auth.token, selectedTeamId, selectedUserId]);
+
+  useEffect(() => {
+    const loadTeams = async () => {
+      if (!auth.token) return;
+      try {
+        const { res, result } = await fetchLeaderTeams(auth.token);
+        if (!res.ok) throw new Error(result.error || 'Fetch teams failed');
+        setTeams(result.data);
+      } catch (e) {
+        console.error(e);
+        setTeams([]);
+      }
+    };
+    loadTeams();
   }, [auth.token]);
 
 
@@ -54,9 +88,11 @@ export default function LeaderDashboard() {
       setIsLoadingGoals(true);
       try {
         const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
+        const teamId = selectedTeamId !== 'All' ? selectedTeamId : undefined;
         const { result } = await fetchLeaderGoals(auth.token, {
           year: selectedYear,
           userId,
+          teamId,
           limit: pageLimit,
           offset: 0,
         });
@@ -67,6 +103,33 @@ export default function LeaderDashboard() {
       }
     };
     fetchFirstPage();
+  }, [auth.token, selectedYear, selectedUserId, selectedTeamId]);
+
+  // Load member insights when a specific member is selected
+  useEffect(() => {
+    const load = async () => {
+      if (!auth.token) return;
+      if (selectedUserId === 'All') {
+        setMemberInsights(null);
+        return;
+      }
+      setIsLoadingInsights(true);
+      try {
+        const { res, result } = await fetchLeaderMemberInsights(auth.token, {
+          year: selectedYear,
+          userId: selectedUserId,
+          weeks: 8,
+        });
+        if (!res.ok) throw new Error(result.error || 'Fetch insights failed');
+        setMemberInsights(result.data);
+      } catch (e) {
+        console.error(e);
+        setMemberInsights(null);
+      } finally {
+        setIsLoadingInsights(false);
+      }
+    };
+    load();
   }, [auth.token, selectedYear, selectedUserId]);
 
   const loadMoreGoals = async () => {
@@ -77,7 +140,8 @@ export default function LeaderDashboard() {
     try {
       const offset = goals.length;
       const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
-      const { result } = await fetchLeaderGoals(auth.token, { year: selectedYear, userId, limit: pageLimit, offset });
+      const teamId = selectedTeamId !== 'All' ? selectedTeamId : undefined;
+      const { result } = await fetchLeaderGoals(auth.token, { year: selectedYear, userId, teamId, limit: pageLimit, offset });
       const next = result.data || [];
       setGoals((prev) => {
         const seen = new Set(prev.map((g) => g.id));
@@ -93,17 +157,6 @@ export default function LeaderDashboard() {
 
   const GOAL_STATUS_OPTIONS = ['All', 'Draft', 'In Progress', 'Completed', 'Cancelled', 'Not started'] as const;
   const REVIEW_STATUS_OPTIONS = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'] as const;
-  const TEAM_OPTIONS = [
-    'All',
-    ...Array.from(
-      new Set(
-        goals
-          .map((g) => g.team)
-          .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
-      )
-    ).sort(),
-  ] as const;
-
   const visibleGoals = goals
     .filter((g) => (goalStatusFilter === 'All' ? true : g.status === goalStatusFilter))
     .filter((g) =>
@@ -112,9 +165,7 @@ export default function LeaderDashboard() {
         : (g.review_status || 'Cancelled') === reviewStatusFilter
     );
 
-  const visibleGoalsWithMemberTeam = visibleGoals
-    .filter((g) => (teamFilter === 'All' ? true : (g.team || '') === teamFilter))
-    ;
+  const visibleGoalsWithMemberTeam = visibleGoals;
 
   const now = new Date();
   const todayStart = new Date(now);
@@ -250,6 +301,49 @@ export default function LeaderDashboard() {
           <StatsCard title="Avg progress" stat={`${avgProgress.toFixed(1)}%`} icon={FaUsers} />
         </div>
 
+        {/* Filters (kept above insights so Leader can choose member/year first) */}
+        <div className="flex space-x-6 mb-6 flex-wrap gap-y-2">
+          <Dropdown
+            label="Year"
+            value={selectedYear}
+            options={YEAR_OPTIONS}
+            onChange={(v) => setSelectedYear(Number(v))}
+          />
+          <Dropdown
+            label="Goal Status"
+            value={goalStatusFilter}
+            options={[...GOAL_STATUS_OPTIONS]}
+            onChange={setGoalStatusFilter}
+          />
+          <Dropdown
+            label="Review Status"
+            value={reviewStatusFilter}
+            options={[...REVIEW_STATUS_OPTIONS]}
+            onChange={setReviewStatusFilter}
+          />
+          <Dropdown
+            label="Team"
+            value={selectedTeamId}
+            options={[
+              { id: 'All', label: 'All teams' },
+              ...teams.map((t) => ({ id: t.id, label: t.name })),
+            ]}
+            onChange={(v) => setSelectedTeamId(String(v))}
+          />
+          <Dropdown
+            label="Member"
+            value={selectedUserId}
+            options={[
+              { id: 'All', label: 'All members' },
+              ...leaderUsers.map((u) => ({
+                id: u.id,
+                label: `${u.name || u.email || u.id}`,
+              })),
+            ]}
+            onChange={(v) => setSelectedUserId(String(v))}
+          />
+        </div>
+
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">Leader Insights</h2>
@@ -275,6 +369,85 @@ export default function LeaderDashboard() {
                   {isLoadingWeeklyStats ? '…' : missingWeeklyReportsThisWeek.length}
                 </p>
               </div>
+            </div>
+          )}
+
+          {showInsights && selectedUserId !== 'All' && (
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold">Member growth signals</h3>
+                  <p className="text-xs text-gray-500">
+                    For selected member • {selectedYear} • last {memberInsights?.window.weeks ?? 8} weeks
+                  </p>
+                </div>
+                <div className="text-xs text-gray-500">{isLoadingInsights ? 'Loading…' : ''}</div>
+              </div>
+
+              {memberInsights && (
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="p-4 bg-white rounded-xl border">
+                    <p className="text-sm text-gray-500">Activity streak</p>
+                    <p className="text-2xl font-bold text-green-700">
+                      {memberInsights.weekly_reports.streak_weeks}w
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Weeks with reports: {memberInsights.weekly_reports.weeks_with_activity}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-white rounded-xl border">
+                    <p className="text-sm text-gray-500">Progress delta</p>
+                    <p className="text-2xl font-bold text-indigo-700">
+                      {memberInsights.progress_delta == null
+                        ? '—'
+                        : `${memberInsights.progress_delta > 0 ? '+' : ''}${memberInsights.progress_delta}pp`}
+                    </p>
+                    <p className="text-xs text-gray-400">Avg progress this week vs last week</p>
+                  </div>
+                  <div className="p-4 bg-white rounded-xl border">
+                    <p className="text-sm text-gray-500">Evidence rate</p>
+                    <p className="text-2xl font-bold text-blue-700">
+                      {Math.round(memberInsights.action_plans.evidence_rate * 100)}%
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {memberInsights.action_plans.completed_with_evidence}/{memberInsights.action_plans.completed} completed
+                    </p>
+                  </div>
+                  <div className="p-4 bg-white rounded-xl border">
+                    <p className="text-sm text-gray-500">Overdue plans</p>
+                    <p className="text-2xl font-bold text-red-700">
+                      {memberInsights.action_plans.overdue}
+                    </p>
+                    <p className="text-xs text-gray-400">Total plans: {memberInsights.action_plans.total}</p>
+                  </div>
+                  <div className="p-4 bg-white rounded-xl border">
+                    <p className="text-sm text-gray-500">Stagnant goals</p>
+                    <p className="text-2xl font-bold text-orange-700">
+                      {memberInsights.goals.health.stagnant}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      At risk: {memberInsights.goals.health.atRisk} • High risk: {memberInsights.goals.health.highRisk}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {memberInsights?.weekly_reports.top_blockers?.length ? (
+                <div className="bg-white rounded-xl border overflow-hidden">
+                  <div className="px-4 py-3 border-b">
+                    <h4 className="font-semibold">Common blockers (last {memberInsights.window.weeks} weeks)</h4>
+                    <p className="text-xs text-gray-500">Quick qualitative signal from weekly reports</p>
+                  </div>
+                  <div className="p-4 space-y-2 text-sm">
+                    {memberInsights.weekly_reports.top_blockers.map((b) => (
+                      <div key={b.text} className="flex items-start justify-between gap-4">
+                        <div className="text-gray-700 line-clamp-2">{b.text}</div>
+                        <div className="text-gray-500 font-semibold">{b.count}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -468,45 +641,6 @@ export default function LeaderDashboard() {
               </div>
             </div>
           )}
-        </div>
-
-        <div className="flex space-x-6 mb-6 flex-wrap gap-y-2">
-          <Dropdown
-            label="Year"
-            value={selectedYear}
-            options={YEAR_OPTIONS}
-            onChange={(v) => setSelectedYear(Number(v))}
-          />
-          <Dropdown
-            label="Goal Status"
-            value={goalStatusFilter}
-            options={[...GOAL_STATUS_OPTIONS]}
-            onChange={setGoalStatusFilter}
-          />
-          <Dropdown
-            label="Review Status"
-            value={reviewStatusFilter}
-            options={[...REVIEW_STATUS_OPTIONS]}
-            onChange={setReviewStatusFilter}
-          />
-          <Dropdown
-            label="Team"
-            value={teamFilter}
-            options={[...TEAM_OPTIONS] as unknown as string[]}
-            onChange={setTeamFilter}
-          />
-          <Dropdown
-            label="Member"
-            value={selectedUserId}
-            options={[
-              { id: 'All', label: 'All members' },
-              ...leaderUsers.map((u) => ({
-                id: u.id,
-                label: `${u.name || u.email || u.id}${u.team ? ` • ${u.team}` : ''}`,
-              })),
-            ]}
-            onChange={(v) => setSelectedUserId(String(v))}
-          />
         </div>
 
         {/* Goals */}
