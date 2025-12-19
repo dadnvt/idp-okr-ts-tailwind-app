@@ -23,6 +23,7 @@ import {
 import { fetchLeaderGoals } from '../api/leaderApi';
 import { fetchLeaderUsers, type LeaderUser } from '../api/usersApi';
 import { fetchLeaderTeams, type LeaderTeam } from '../api/teamsApi';
+import { formatDateOnly } from '../common/Utility';
 
 export default function GoalsPage() {
   const years = YEAR_OPTIONS;
@@ -306,7 +307,6 @@ export default function GoalsPage() {
                 label="Team"
                 value={selectedTeamId}
                 options={[
-                  { id: 'All', label: 'All teams' },
                   ...teams.map((t) => ({ id: t.id, label: t.name })),
                 ]}
                 onChange={(v) => setSelectedTeamId(String(v))}
@@ -482,6 +482,32 @@ export default function GoalsPage() {
                 <p>
                   <strong>Leader notes:</strong> {detailGoal.leader_review_notes}
                 </p>
+              )}
+
+              {(detailGoal.reviewed_at ||
+                detailGoal.approved_at ||
+                detailGoal.rejected_at ||
+                detailGoal.reviewed_by_name ||
+                detailGoal.reviewed_by_email ||
+                detailGoal.reviewed_by) && (
+                <div className="border rounded p-3 bg-gray-50 mt-3 text-sm space-y-1">
+                  <p>
+                    <strong>Reviewed by:</strong>{' '}
+                    {detailGoal.reviewed_by_name ||
+                      detailGoal.reviewed_by_email ||
+                      detailGoal.reviewed_by ||
+                      '-'}
+                  </p>
+                  <p>
+                    <strong>Reviewed at:</strong> {formatDateOnly(detailGoal.reviewed_at) || '-'}
+                  </p>
+                  <p>
+                    <strong>Approved at:</strong> {formatDateOnly(detailGoal.approved_at) || '-'}
+                  </p>
+                  <p>
+                    <strong>Rejected at:</strong> {formatDateOnly(detailGoal.rejected_at) || '-'}
+                  </p>
+                </div>
               )}
 
               {detailGoal.review_status === 'Pending' && detailGoal.is_locked && (

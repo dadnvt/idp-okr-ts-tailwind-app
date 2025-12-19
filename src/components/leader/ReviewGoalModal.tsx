@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Modal from "../../common/Modal";
 import type { IGoal } from "../../types";
 import Dropdown from "../Dropdown";
 import { Button } from "../Button";
+import { formatDateOnly } from "../../common/Utility";
 
 type ReviewStatus = 'Approved' | 'Rejected' | 'Pending';
 
@@ -22,8 +23,17 @@ export default function ReviewGoalModal({
   onClose,
   onSubmit,
 }: ReviewGoalModalProps) {
-  const [status, setStatus] = useState<ReviewStatus>('Approved');
-  const [comment, setComment] = useState('');
+  const initialStatus = ((): ReviewStatus => {
+    const s = goal.review_status;
+    return s === 'Approved' || s === 'Rejected' || s === 'Pending' ? s : 'Approved';
+  })();
+
+  const [status, setStatus] = useState<ReviewStatus>(initialStatus);
+  const [comment, setComment] = useState(goal.leader_review_notes || '');
+
+  const reviewedBy = useMemo(() => {
+    return goal.reviewed_by_name || goal.reviewed_by_email || goal.reviewed_by || null;
+  }, [goal.reviewed_by, goal.reviewed_by_email, goal.reviewed_by_name]);
 
   return (
     <Modal isOpen={true} title="Review Goal" onClose={onClose}>
@@ -33,6 +43,23 @@ export default function ReviewGoalModal({
       <p>
         <strong>Goal:</strong> {goal.name}
       </p>
+
+      {(goal.reviewed_at || goal.approved_at || goal.rejected_at || reviewedBy) && (
+        <div className="border rounded p-3 bg-gray-50 mt-3 text-sm space-y-1">
+          <p>
+            <strong>Last reviewed by:</strong> {reviewedBy || '-'}
+          </p>
+          <p>
+            <strong>Reviewed at:</strong> {formatDateOnly(goal.reviewed_at) || '-'}
+          </p>
+          <p>
+            <strong>Approved at:</strong> {formatDateOnly(goal.approved_at) || '-'}
+          </p>
+          <p>
+            <strong>Rejected at:</strong> {formatDateOnly(goal.rejected_at) || '-'}
+          </p>
+        </div>
+      )}
 
       {/* Status */}
       <Dropdown

@@ -22,6 +22,7 @@ import {
 import { Input } from './Input';
 import { DateInput } from './DateInput';
 import { NumberInput } from './NumberInput';
+import { formatDateOnly } from '../common/Utility';
 
 export default function MemberDashboard() {
   const { auth } = useAuth();
@@ -386,6 +387,32 @@ export default function MemberDashboard() {
                 <p><strong>Review:</strong> {selectedGoal.review_status ?? 'Not requested'}</p>
                 {selectedGoal.leader_review_notes && (
                   <p><strong>Leader notes:</strong> {selectedGoal.leader_review_notes}</p>
+                )}
+
+                {(selectedGoal.reviewed_at ||
+                  selectedGoal.approved_at ||
+                  selectedGoal.rejected_at ||
+                  selectedGoal.reviewed_by_name ||
+                  selectedGoal.reviewed_by_email ||
+                  selectedGoal.reviewed_by) && (
+                  <div className="border rounded p-3 bg-gray-50 mt-3 text-sm space-y-1">
+                    <p>
+                      <strong>Reviewed by:</strong>{' '}
+                      {selectedGoal.reviewed_by_name ||
+                        selectedGoal.reviewed_by_email ||
+                        selectedGoal.reviewed_by ||
+                        '-'}
+                    </p>
+                    <p>
+                      <strong>Reviewed at:</strong> {formatDateOnly(selectedGoal.reviewed_at) || '-'}
+                    </p>
+                    <p>
+                      <strong>Approved at:</strong> {formatDateOnly(selectedGoal.approved_at) || '-'}
+                    </p>
+                    <p>
+                      <strong>Rejected at:</strong> {formatDateOnly(selectedGoal.rejected_at) || '-'}
+                    </p>
+                  </div>
                 )}
 
                 {selectedGoal.review_status === 'Pending' && selectedGoal.is_locked && (

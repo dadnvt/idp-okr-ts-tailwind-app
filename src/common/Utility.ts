@@ -135,3 +135,16 @@ export function parseDateOnly(dateStr: string): Date {
   d.setHours(0, 0, 0, 0);
   return d;
 }
+
+// Format ISO-ish timestamps to YYYY-MM-DD (date only).
+// - If string already starts with YYYY-MM-DD, just return that.
+// - Otherwise, try Date parsing and fall back to original string.
+export function formatDateOnly(input?: string | null): string | null {
+  if (!input) return null;
+  const s = String(input);
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m?.[1]) return m[1];
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return s;
+}

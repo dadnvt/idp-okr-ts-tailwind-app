@@ -22,6 +22,7 @@ import ReviewActionPlanModal from '../components/leader/ReviewActionPlanModal';
 import WeeklyReportCreateModal from '../components/WeeklyReportCreateModal';
 import { createWeeklyReport } from '../api/weeklyReportsApi';
 import { Button } from '../components/Button';
+import { formatDateOnly } from '../common/Utility';
 
 export default function ActionPlansPage() {
   const { auth } = useAuth();
@@ -205,7 +206,6 @@ export default function ActionPlansPage() {
                 label="Team"
                 value={selectedTeamId}
                 options={[
-                  { id: 'All', label: 'All teams' },
                   ...teams.map((t) => ({ id: t.id, label: t.name })),
                 ]}
                 onChange={(v) => setSelectedTeamId(String(v))}
@@ -286,6 +286,12 @@ export default function ActionPlansPage() {
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex flex-col gap-1">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white">{goal.name}</h3>
+                    {auth.user?.role === 'leader' && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="font-semibold">Member:</span> {goal.user_name || goal.user_email || '-'}
+                        {goal.team ? <span className="text-gray-500"> • Team: {goal.team}</span> : null}
+                      </p>
+                    )}
                     <div className="flex gap-2 items-center">
                       <span className={`text-xs font-semibold px-2 py-1 rounded-full ${goal.type === 'Hard' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800'}`}>
                         {goal.type}
@@ -498,6 +504,26 @@ export default function ActionPlansPage() {
                 <div className="border rounded p-3 bg-gray-50">
                   <p><strong className='font-medium'>Review status:</strong> {selectedPlan.review_status ?? 'Pending'}</p>
                   <p><strong className='font-medium'>Leader notes:</strong> {selectedPlan.leader_review_notes || '-'}</p>
+
+                  {(selectedPlan.reviewed_at ||
+                    selectedPlan.approved_at ||
+                    selectedPlan.rejected_at ||
+                    selectedPlan.reviewed_by_name ||
+                    selectedPlan.reviewed_by_email ||
+                    selectedPlan.reviewed_by) && (
+                    <div className="mt-2 text-sm space-y-1">
+                      <p>
+                        <strong className="font-medium">Reviewed by:</strong>{' '}
+                        {selectedPlan.reviewed_by_name ||
+                          selectedPlan.reviewed_by_email ||
+                          selectedPlan.reviewed_by ||
+                          '-'}
+                      </p>
+                      <p><strong className="font-medium">Reviewed at:</strong> {formatDateOnly(selectedPlan.reviewed_at) || '-'}</p>
+                      <p><strong className="font-medium">Approved at:</strong> {formatDateOnly(selectedPlan.approved_at) || '-'}</p>
+                      <p><strong className="font-medium">Rejected at:</strong> {formatDateOnly(selectedPlan.rejected_at) || '-'}</p>
+                    </div>
+                  )}
                 </div>
               )}
 

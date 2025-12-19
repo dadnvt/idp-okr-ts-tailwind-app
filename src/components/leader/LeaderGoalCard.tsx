@@ -4,10 +4,12 @@ import { Button } from '../Button';
 interface Props {
   goal: IGoal;
   onReviewClick: (goal: IGoal) => void;
+  onDetailClick: (goal: IGoal) => void;
 }
 
-export default function LeaderGoalCard({ goal, onReviewClick }: Props) {
+export default function LeaderGoalCard({ goal, onReviewClick, onDetailClick }: Props) {
   const memberLabel = goal.user_name || goal.user_email;
+  const isApproved = goal.review_status === 'Approved';
   return (
     <div className="bg-white rounded-xl p-5 shadow flex flex-col justify-between">
       <div>
@@ -26,9 +28,15 @@ export default function LeaderGoalCard({ goal, onReviewClick }: Props) {
         </div>
       </div>
 
-      <Button onClick={() => onReviewClick(goal)} variant="primary" fullWidth className="mt-4">
-        Review
-      </Button>
+      {isApproved ? (
+        <Button onClick={() => onDetailClick(goal)} variant="secondary" fullWidth className="mt-4">
+          View details
+        </Button>
+      ) : (
+        <Button onClick={() => onReviewClick(goal)} variant="primary" fullWidth className="mt-4">
+          Review
+        </Button>
+      )}
     </div>
   );
 }

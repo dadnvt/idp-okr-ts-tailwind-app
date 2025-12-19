@@ -7,7 +7,7 @@ import Sidebar from '../Sidebar';
 import StatsCard from '../StatsCard';
 import { useAuth } from '../../common/AuthContext';
 import LeaderGoalCard from './LeaderGoalCard';
-import { fetchLeaderGoals, fetchLeaderWeeklyReportStats, reviewLeaderGoal, type LeaderWeeklyReportStats } from '../../api/leaderApi';
+import { fetchLeaderGoals, fetchLeaderGoalsSummary, fetchLeaderWeeklyReportStats, reviewLeaderGoal, type LeaderGoalsSummary, type LeaderWeeklyReportStats } from '../../api/leaderApi';
 import { fetchLeaderUsers, type LeaderUser } from '../../api/usersApi';
 import { fetchLeaderMemberInsights, type LeaderMemberInsights } from '../../api/leaderInsightsApi';
 import { fetchLeaderTeams, type LeaderTeam } from '../../api/teamsApi';
@@ -31,6 +31,9 @@ export default function LeaderDashboard() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [isLoadingGoals, setIsLoadingGoals] = useState(false);
   const [hasMoreGoals, setHasMoreGoals] = useState(true);
+  const [goalsSummary, setGoalsSummary] = useState<LeaderGoalsSummary | null>(null);
+  const [isLoadingGoalsSummary, setIsLoadingGoalsSummary] = useState(false);
+  const [goalsSummaryRefreshKey, setGoalsSummaryRefreshKey] = useState(0);
   const [weeklyReportStats, setWeeklyReportStats] = useState<LeaderWeeklyReportStats | null>(null);
   const [isLoadingWeeklyStats, setIsLoadingWeeklyStats] = useState(false);
   const [memberInsights, setMemberInsights] = useState<LeaderMemberInsights | null>(null);
@@ -72,14 +75,48 @@ export default function LeaderDashboard() {
       try {
         const { res, result } = await fetchLeaderTeams(auth.token);
         if (!res.ok) throw new Error(result.error || 'Fetch teams failed');
-        setTeams(result.data);
+        const list = result.data || [];
+        setTeams(list);
+
+        // Default to leader's own team (Cognito locale) when available.
+        // This makes dashboard stats match "leader team NET" expectation.
+        if (selectedTeamId === 'All' && auth.user?.team) {
+          const needle = String(auth.user.team).trim().toLowerCase();
+          const match = list.find((t) => String(t.name || '').trim().toLowerCase() === needle);
+          if (match?.id) setSelectedTeamId(match.id);
+        }
       } catch (e) {
         console.error(e);
         setTeams([]);
       }
     };
     loadTeams();
-  }, [auth.token]);
+  }, [auth.token, auth.user?.team, selectedTeamId]);
+
+  // Summary stats (NOT based on paged goals list)
+  useEffect(() => {
+    const load = async () => {
+      if (!auth.token) return;
+      setIsLoadingGoalsSummary(true);
+      try {
+        const userId = selectedUserId !== 'All' ? selectedUserId : undefined;
+        const teamId = selectedTeamId !== 'All' ? selectedTeamId : undefined;
+        const { res, result } = await fetchLeaderGoalsSummary(auth.token, {
+          year: selectedYear,
+          userId,
+          teamId,
+        });
+        if (!res.ok) throw new Error(result.error || 'Fetch goals summary failed');
+        setGoalsSummary(result.data);
+      } catch (e) {
+        console.error(e);
+        setGoalsSummary({ total: 0, approved: 0, pending: 0, avgProgress: 0 });
+      } finally {
+        setIsLoadingGoalsSummary(false);
+      }
+    };
+    load();
+  }, [auth.token, selectedYear, selectedUserId, selectedTeamId, goalsSummaryRefreshKey]);
 
 
   useEffect(() => {
@@ -274,13 +311,9 @@ export default function LeaderDashboard() {
     })
   );
 
-  const totalGoals = goals.length;
-  const approved = goals.filter(g => g.review_status === 'Approved').length;
-  const pending = goals.filter(g => !g.review_status || g.review_status === 'Pending').length;
-  const avgProgress =
-    totalGoals > 0
-      ? goals.reduce((s, g) => s + g.progress, 0) / totalGoals
-      : 0;
+  const approved = goalsSummary?.approved ?? 0;
+  const pending = goalsSummary?.pending ?? 0;
+  const avgProgress = goalsSummary?.avgProgress ?? 0;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -296,9 +329,24 @@ export default function LeaderDashboard() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-          <StatsCard title="Goals to review" stat={pending} icon={FaBullseye} />
-          <StatsCard title="Goals approved" stat={approved} icon={FaClipboardList} />
-          <StatsCard title="Avg progress" stat={`${avgProgress.toFixed(1)}%`} icon={FaUsers} />
+          <StatsCard
+            title="Goals to review"
+            tooltip="Count of goals in scope whose review_status is NULL or Pending (team/year/member filters apply)."
+            stat={isLoadingGoalsSummary ? '…' : pending}
+            icon={FaBullseye}
+          />
+          <StatsCard
+            title="Goals approved"
+            tooltip="Count of goals in scope whose review_status is Approved (team/year/member filters apply)."
+            stat={isLoadingGoalsSummary ? '…' : approved}
+            icon={FaClipboardList}
+          />
+          <StatsCard
+            title="Avg progress"
+            tooltip="Average of goal.progress (%) across ALL goals in scope (team/year/member filters). Not based on paging."
+            stat={isLoadingGoalsSummary ? '…' : `${avgProgress.toFixed(1)}%`}
+            icon={FaUsers}
+          />
         </div>
 
         {/* Filters (kept above insights so Leader can choose member/year first) */}
@@ -325,7 +373,6 @@ export default function LeaderDashboard() {
             label="Team"
             value={selectedTeamId}
             options={[
-              { id: 'All', label: 'All teams' },
               ...teams.map((t) => ({ id: t.id, label: t.name })),
             ]}
             onChange={(v) => setSelectedTeamId(String(v))}
@@ -387,7 +434,12 @@ export default function LeaderDashboard() {
               {memberInsights && (
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   <div className="p-4 bg-white rounded-xl border">
-                    <p className="text-sm text-gray-500">Activity streak</p>
+                    <p
+                      className="text-sm text-gray-500 cursor-help"
+                      title="Consecutive weeks (counting back from this week) with at least 1 weekly report."
+                    >
+                      Activity streak
+                    </p>
                     <p className="text-2xl font-bold text-green-700">
                       {memberInsights.weekly_reports.streak_weeks}w
                     </p>
@@ -396,7 +448,12 @@ export default function LeaderDashboard() {
                     </p>
                   </div>
                   <div className="p-4 bg-white rounded-xl border">
-                    <p className="text-sm text-gray-500">Progress delta</p>
+                    <p
+                      className="text-sm text-gray-500 cursor-help"
+                      title='Average progress change (percentage points) this week vs last week. Requires goal_progress_history; otherwise shows "—".'
+                    >
+                      Progress delta
+                    </p>
                     <p className="text-2xl font-bold text-indigo-700">
                       {memberInsights.progress_delta == null
                         ? '—'
@@ -421,7 +478,12 @@ export default function LeaderDashboard() {
                     <p className="text-xs text-gray-400">Total plans: {memberInsights.action_plans.total}</p>
                   </div>
                   <div className="p-4 bg-white rounded-xl border">
-                    <p className="text-sm text-gray-500">Stagnant goals</p>
+                    <p
+                      className="text-sm text-gray-500 cursor-help"
+                      title="Health heuristic: stagnant = Approved + 0% progress for >10 days since start. At risk/high risk are based on expected progress vs actual progress."
+                    >
+                      Stagnant goals
+                    </p>
                     <p className="text-2xl font-bold text-orange-700">
                       {memberInsights.goals.health.stagnant}
                     </p>
@@ -650,6 +712,7 @@ export default function LeaderDashboard() {
               key={goal.id}
               goal={goal}
               onReviewClick={setReviewGoal}
+              onDetailClick={setSelectedGoal}
             />
           ))}
         </div>
@@ -705,6 +768,7 @@ export default function LeaderDashboard() {
                     : g
                 )
               );
+              setGoalsSummaryRefreshKey((k) => k + 1);
               setReviewGoal(null);
             }}
           />

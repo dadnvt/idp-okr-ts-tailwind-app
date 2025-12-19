@@ -33,6 +33,12 @@ export interface IGoal {
   is_locked: boolean; // Trạng thái khóa (do Leader review)
   leader_review_notes: string; // Ghi chú đánh giá của Leader
   review_status: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled' | string;
+  reviewed_by?: string | null;
+  reviewed_by_email?: string | null;
+  reviewed_by_name?: string | null;
+  reviewed_at?: string | null;
+  approved_at?: string | null;
+  rejected_at?: string | null;
   duration_type: string;
   action_plans?: IActionPlan[];
 }
@@ -54,6 +60,12 @@ export interface IActionPlan {
   is_locked?: boolean;
   leader_review_notes?: string | null;
   review_status?: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled' | string;
+  reviewed_by?: string | null;
+  reviewed_by_email?: string | null;
+  reviewed_by_name?: string | null;
+  reviewed_at?: string | null;
+  approved_at?: string | null;
+  rejected_at?: string | null;
 }
 
 export interface IWeeklyReport {

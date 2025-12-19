@@ -8,6 +8,13 @@ export type LeaderWeeklyReportStats = Record<
   { lastReportDate: string | null; hasReportInRange: boolean }
 >;
 
+export type LeaderGoalsSummary = {
+  total: number;
+  approved: number;
+  pending: number;
+  avgProgress: number;
+};
+
 // React 18 StrictMode (dev) intentionally mounts components twice to surface side effects.
 // That can lead to duplicate API calls from mount effects. We dedupe in-flight requests here
 // (module scope persists across StrictMode mount/unmount) so we only hit the server once.
@@ -47,6 +54,21 @@ export async function fetchLeaderGoals(
 
   const res = await apiFetch(path, {}, token);
   const result = (await res.json()) as ApiEnvelope<IGoal[]>;
+  return { res, result };
+}
+
+export async function fetchLeaderGoalsSummary(
+  token: string | null,
+  params: { year: number; userId?: string; teamId?: string }
+) {
+  const qs = new URLSearchParams();
+  qs.set('year', String(params.year));
+  if (typeof params.userId === 'string' && params.userId.trim()) qs.set('user_id', params.userId.trim());
+  if (typeof params.teamId === 'string' && params.teamId.trim()) qs.set('team_id', params.teamId.trim());
+  const path = `${API_PATHS.leaderGoals}/summary?${qs.toString()}`;
+
+  const res = await apiFetch(path, {}, token);
+  const result = (await res.json()) as ApiEnvelope<LeaderGoalsSummary> & { error?: string; message?: string };
   return { res, result };
 }
 

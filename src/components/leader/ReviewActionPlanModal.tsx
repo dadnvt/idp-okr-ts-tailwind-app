@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Modal from '../../common/Modal';
 import type { IActionPlan } from '../../types';
 import Dropdown from '../Dropdown';
 import { Button } from '../Button';
+import { formatDateOnly } from '../../common/Utility';
 
 type ReviewStatus = 'Approved' | 'Rejected' | 'Pending';
 
@@ -22,8 +23,17 @@ export default function ReviewActionPlanModal({
   onClose,
   onSubmit,
 }: ReviewActionPlanModalProps) {
-  const [status, setStatus] = useState<ReviewStatus>('Approved');
-  const [comment, setComment] = useState('');
+  const initialStatus = ((): ReviewStatus => {
+    const s = plan.review_status;
+    return s === 'Approved' || s === 'Rejected' || s === 'Pending' ? s : 'Approved';
+  })();
+
+  const [status, setStatus] = useState<ReviewStatus>(initialStatus);
+  const [comment, setComment] = useState(plan.leader_review_notes || '');
+
+  const reviewedBy = useMemo(() => {
+    return plan.reviewed_by_name || plan.reviewed_by_email || plan.reviewed_by || null;
+  }, [plan.reviewed_by, plan.reviewed_by_email, plan.reviewed_by_name]);
 
   return (
     <Modal isOpen={true} title="Review Action Plan" onClose={onClose}>
@@ -43,6 +53,23 @@ export default function ReviewActionPlanModal({
           </p>
           <p className="text-xs text-gray-500 font-medium">
             Approve sẽ apply deadline mới. Reject sẽ bỏ request.
+          </p>
+        </div>
+      )}
+
+      {(plan.reviewed_at || plan.approved_at || plan.rejected_at || reviewedBy) && (
+        <div className="border rounded p-3 bg-gray-50 mt-3 text-sm space-y-1">
+          <p>
+            <strong>Last reviewed by:</strong> {reviewedBy || '-'}
+          </p>
+          <p>
+            <strong>Reviewed at:</strong> {formatDateOnly(plan.reviewed_at) || '-'}
+          </p>
+          <p>
+            <strong>Approved at:</strong> {formatDateOnly(plan.approved_at) || '-'}
+          </p>
+          <p>
+            <strong>Rejected at:</strong> {formatDateOnly(plan.rejected_at) || '-'}
           </p>
         </div>
       )}
