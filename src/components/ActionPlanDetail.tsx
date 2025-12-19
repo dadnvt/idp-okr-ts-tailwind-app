@@ -4,7 +4,13 @@ import { useAuth } from "../common/AuthContext";
 import { fetchWeeklyReportsByActionPlan, updateWeeklyReport } from "../api/weeklyReportsApi";
 import { Button } from "./Button";
 
-export function ActionPlanDetail({ plan }: { plan: IActionPlan }) {
+export function ActionPlanDetail({
+  plan,
+  refreshKey,
+}: {
+  plan: IActionPlan;
+  refreshKey?: number;
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { auth } = useAuth();
   const [reports, setReports] = useState<IWeeklyReport[]>([]);
@@ -39,7 +45,7 @@ export function ActionPlanDetail({ plan }: { plan: IActionPlan }) {
       }
     };
     load();
-  }, [auth.token, plan.id]);
+  }, [auth.token, plan.id, refreshKey]);
 
   return (
     <div className="space-y-4">

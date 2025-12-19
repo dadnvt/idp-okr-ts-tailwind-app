@@ -32,6 +32,7 @@ export default function ActionPlansPage() {
   const [selectedGoal, setSelectedGoal] = useState<IGoal | null>(null);
   const [reviewPlan, setReviewPlan] = useState<IActionPlan | null>(null);
   const [createWeeklyForPlan, setCreateWeeklyForPlan] = useState<IActionPlan | null>(null);
+  const [weeklyReportRefreshKey, setWeeklyReportRefreshKey] = useState(0);
   const [editPlanStatus, setEditPlanStatus] = useState<IActionPlan['status']>('Not started');
   const [editPlanEndDate, setEditPlanEndDate] = useState<string>('');
   const [goalStatusFilter, setGoalStatusFilter] = useState<string>('All');
@@ -377,7 +378,7 @@ export default function ActionPlansPage() {
             onClose={() => setSelectedPlan(null)}
           >
             <div className="space-y-4">
-              <ActionPlanDetail plan={selectedPlan} />
+              <ActionPlanDetail plan={selectedPlan} refreshKey={weeklyReportRefreshKey} />
 
               {auth.user?.role !== 'leader' && (
                 <div className="border rounded p-3 bg-white space-y-3">
@@ -557,8 +558,9 @@ export default function ActionPlansPage() {
               if (!res.ok) throw new Error(result.error || 'Create weekly report failed');
 
               // Direction B: weekly reports are loaded lazily (per plan) so we don't keep them inside goal list state.
-              // We just close the modal; the detail view can refetch its first page if needed.
+              // We just close the modal; the detail view refetches its first page via refreshKey.
 
+              setWeeklyReportRefreshKey((k) => k + 1);
               setCreateWeeklyForPlan(null);
             }}
           />
