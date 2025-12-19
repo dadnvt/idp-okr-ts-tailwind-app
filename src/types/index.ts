@@ -41,6 +41,13 @@ export interface IGoal {
   rejected_at?: string | null;
   duration_type: string;
   action_plans?: IActionPlan[];
+
+  // Verification summary (computed from verification_requests + verification_reviews)
+  verification_request_id?: string | null;
+  verification_status?: 'NotRequested' | 'Pending' | 'Reviewed' | 'Cancelled' | string;
+  verification_requested_at?: string | null;
+  verification_result?: 'Pass' | 'NeedsWork' | 'Fail' | string | null;
+  verification_reviewed_at?: string | null;
 }
 
 export interface IActionPlan {

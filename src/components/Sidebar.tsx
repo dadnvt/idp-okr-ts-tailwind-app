@@ -4,7 +4,8 @@ import {
   FaFlag,
   FaClipboardList,
   FaCalendarAlt,
-  FaSignOutAlt 
+  FaSignOutAlt, 
+  FaTeamspeak
 } from 'react-icons/fa';
 import { useAuth } from '../common/AuthContext';
 import { Button } from './Button';
@@ -14,7 +15,7 @@ export default function Sidebar() {
     { label: 'Dashboard', icon: FaThLarge, path: '/dashboard' },
     { label: 'Goals', icon: FaFlag, path: '/goals' },
     { label: 'Action Plans', icon: FaClipboardList, path: '/action-plans' },
-    { label: 'Weekly Reports', icon: FaCalendarAlt, path: '/weekly-reports' },
+    { label: 'Verification', icon: FaTeamspeak, path: '/verify-test' }
   ];
 
   const { logout } = useAuth();

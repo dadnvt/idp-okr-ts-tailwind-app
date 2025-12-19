@@ -6,6 +6,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import ActionPlans from './pages/ActionPlans';
 import Goals from './pages/Goals';
 import WeeklyReports from './pages/WeeklyReports';
+import VerifyTest from './pages/VerifyTest';
 import { buildApiUrl } from './common/api';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import MaintenancePage from './pages/Maintenance';
@@ -106,6 +107,7 @@ function AppContent() {
           <Route path="/dashboard" element={<LeaderDashboard />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/action-plans" element={<ActionPlans />} />
+          <Route path="/verify-test" element={<VerifyTest />} />
           <Route path="/weekly-reports" element={<WeeklyReports />} />
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -116,6 +118,7 @@ function AppContent() {
           <Route path="/dashboard" element={<MemberDashboard />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/action-plans" element={<ActionPlans />} />
+          <Route path="/verify-test" element={<VerifyTest />} />
           <Route path="/weekly-reports" element={<WeeklyReports />} />
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

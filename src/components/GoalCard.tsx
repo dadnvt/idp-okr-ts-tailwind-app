@@ -35,6 +35,14 @@ export default function GoalCard({
   };
 
   const health = getGoalHealth(goal);
+  const verificationLabel = (() => {
+    const s = goal.verification_status;
+    if (!s || s === 'NotRequested') return 'Not requested';
+    if (s === 'Reviewed') {
+      return goal.verification_result ? `Reviewed • ${goal.verification_result}` : 'Reviewed';
+    }
+    return s;
+  })();
 
   return (
     <div
@@ -84,6 +92,9 @@ export default function GoalCard({
       </p>
       <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
         Review Status: {goal.review_status}
+      </p>
+      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        Verification: {verificationLabel}
       </p>
       <p className="text-sm font-medium mb-2">
         Health:
