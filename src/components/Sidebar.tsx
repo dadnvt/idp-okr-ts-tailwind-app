@@ -3,7 +3,6 @@ import {
   FaThLarge,
   FaFlag,
   FaClipboardList,
-  FaCalendarAlt,
   FaSignOutAlt, 
   FaTeamspeak
 } from 'react-icons/fa';

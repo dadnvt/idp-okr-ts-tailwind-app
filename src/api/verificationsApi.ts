@@ -1,5 +1,4 @@
 import { apiFetch } from '../common/api';
-import { API_PATHS } from './paths';
 
 type ApiEnvelope<T> = { data: T; error?: string };
 

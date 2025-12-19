@@ -9,7 +9,6 @@ import { useAuth } from '../common/AuthContext';
 import type { IActionPlan, IGoal } from '../types';
 import { YEAR_OPTIONS } from '../common/constants';
 import { fetchActionPlansByYear } from '../api/actionPlansApi';
-import { fetchLeaderGoals } from '../api/leaderApi';
 import { fetchLeaderUsers, type LeaderUser } from '../api/usersApi';
 import { fetchLeaderTeams, type LeaderTeam } from '../api/teamsApi';
 import {
