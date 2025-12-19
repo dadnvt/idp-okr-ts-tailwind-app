@@ -7,9 +7,11 @@ import { Button } from "./Button";
 export function ActionPlanDetail({
   plan,
   refreshKey,
+  createdWeeklyReport,
 }: {
   plan: IActionPlan;
   refreshKey?: number;
+  createdWeeklyReport?: IWeeklyReport | null;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { auth } = useAuth();
@@ -17,6 +19,18 @@ export function ActionPlanDetail({
   const [isLoading, setIsLoading] = useState(false);
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  // Optimistic update: immediately show the newly created weekly report
+  // (sometimes GET-after-POST can be eventually consistent).
+  useEffect(() => {
+    if (!createdWeeklyReport) return;
+    if (createdWeeklyReport.action_plan_id !== plan.id) return;
+
+    setReports((prev) => {
+      if (prev.some((r) => r.id === createdWeeklyReport.id)) return prev;
+      return [createdWeeklyReport, ...prev];
+    });
+  }, [createdWeeklyReport, plan.id]);
 
   const weeklyReports = useMemo(() => {
     return [...reports].sort((a, b) => (b.date || '').localeCompare(a.date || ''));

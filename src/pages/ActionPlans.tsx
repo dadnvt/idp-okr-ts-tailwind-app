@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import Modal from '../common/Modal';
-import type { IActionPlan, IGoal } from '../types';
+import type { IActionPlan, IGoal, IWeeklyReport } from '../types';
 import { ActionPlanDetail } from '../components/ActionPlanDetail';
 import { CreateActionPlanForm } from '../components/CreateActionPlanForm';
 import Dropdown from '../components/Dropdown';
@@ -33,6 +33,7 @@ export default function ActionPlansPage() {
   const [reviewPlan, setReviewPlan] = useState<IActionPlan | null>(null);
   const [createWeeklyForPlan, setCreateWeeklyForPlan] = useState<IActionPlan | null>(null);
   const [weeklyReportRefreshKey, setWeeklyReportRefreshKey] = useState(0);
+  const [lastCreatedWeeklyReport, setLastCreatedWeeklyReport] = useState<IWeeklyReport | null>(null);
   const [editPlanStatus, setEditPlanStatus] = useState<IActionPlan['status']>('Not started');
   const [editPlanEndDate, setEditPlanEndDate] = useState<string>('');
   const [goalStatusFilter, setGoalStatusFilter] = useState<string>('All');
@@ -378,7 +379,11 @@ export default function ActionPlansPage() {
             onClose={() => setSelectedPlan(null)}
           >
             <div className="space-y-4">
-              <ActionPlanDetail plan={selectedPlan} refreshKey={weeklyReportRefreshKey} />
+              <ActionPlanDetail
+                plan={selectedPlan}
+                refreshKey={weeklyReportRefreshKey}
+                createdWeeklyReport={lastCreatedWeeklyReport}
+              />
 
               {auth.user?.role !== 'leader' && (
                 <div className="border rounded p-3 bg-white space-y-3">
@@ -560,6 +565,7 @@ export default function ActionPlansPage() {
               // Direction B: weekly reports are loaded lazily (per plan) so we don't keep them inside goal list state.
               // We just close the modal; the detail view refetches its first page via refreshKey.
 
+              setLastCreatedWeeklyReport(result.data ?? null);
               setWeeklyReportRefreshKey((k) => k + 1);
               setCreateWeeklyForPlan(null);
             }}

@@ -65,7 +65,7 @@ function AppContent() {
   // Periodic health probe (auto-recover when server is back)
   useEffect(() => {
     checkReachable();
-    const id = window.setInterval(checkReachable, 15000);
+    const id = window.setInterval(checkReachable, 10 * 60 * 1000);
     return () => window.clearInterval(id);
   }, [checkReachable]);
 
