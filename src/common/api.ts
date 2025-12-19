@@ -6,7 +6,7 @@
  */
 export const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() ||
-  'http://localhost:3000';
+  'https://4z8g473bcb.execute-api.us-east-1.amazonaws.com/prod';
 
 export function buildApiUrl(path: string): string {
   const base = API_BASE_URL.replace(/\/+$/, '');
