@@ -90,7 +90,7 @@ export interface IWeeklyReport {
 export interface IUser {
   id: string;
   email: string;
-  role: 'member' | 'leader';
+  role: 'member' | 'leader' | 'manager';
 }
 
 export interface IReportFormInput {

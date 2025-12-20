@@ -3,7 +3,18 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { signIn, signOut, fetchAuthSession, fetchUserAttributes } from '@aws-amplify/auth';
 import type { AuthState } from '../types/AuthState';
 
-type Role = 'member' | 'leader';
+type Role = 'member' | 'leader' | 'manager';
+
+function getGroupList(groups: unknown): string[] {
+  return Array.isArray(groups) ? (groups as string[]) : typeof groups === 'string' ? [groups] : [];
+}
+
+function deriveRoleFromGroups(groups: unknown): Role {
+  const list = getGroupList(groups);
+  if (list.includes('manager')) return 'manager';
+  if (list.includes('leader')) return 'leader';
+  return 'member';
+}
 
 interface AuthContextType {
   auth: AuthState;
@@ -33,9 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const session = await fetchAuthSession();
     const attributes = await fetchUserAttributes();
     const token = session.tokens?.accessToken?.toString() || null;
-    const groups = session.tokens?.idToken?.payload['cognito:groups'];
-    const role =
-      (Array.isArray(groups) ? groups[0] : 'member') as Role;
+    const groups =
+      session.tokens?.idToken?.payload['cognito:groups'] ??
+      session.tokens?.accessToken?.payload['cognito:groups'];
+    const role = deriveRoleFromGroups(groups);
 
     setAuth({
       token: token,
@@ -62,10 +74,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const session = await fetchAuthSession();
         const token = session.tokens?.accessToken?.toString() || null;
-        const groups = session.tokens?.accessToken?.payload['cognito:groups'];
+        const groups =
+          session.tokens?.idToken?.payload['cognito:groups'] ??
+          session.tokens?.accessToken?.payload['cognito:groups'];
         const attributes = await fetchUserAttributes();
-        const role =
-            (Array.isArray(groups) ? groups[0] : 'member') as Role;
+        const role = deriveRoleFromGroups(groups);
 
         setAuth({
           token: token,

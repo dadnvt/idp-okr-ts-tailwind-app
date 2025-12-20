@@ -2,6 +2,7 @@ import { AuthProvider, useAuth } from './common/AuthContext';
 import MemberDashboard from './components/MemberDashboard';
 import Homepage from './pages/Homepage';
 import LeaderDashboard from './components/leader/LeaderDashboard';
+import ManagerDashboard from './components/manager/ManagerDashboard';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ActionPlans from './pages/ActionPlans';
 import Goals from './pages/Goals';
@@ -100,7 +101,13 @@ function AppContent() {
 
   return (
     <Routes>
-      {auth.user?.role === 'leader' ? (
+      {auth.user?.role === 'manager' ? (
+        <>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<ManagerDashboard />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </>
+      ) : auth.user?.role === 'leader' ? (
         <>
           {/* Default route for leader */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
