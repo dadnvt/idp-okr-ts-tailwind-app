@@ -97,7 +97,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // LOGIN
   const login = async (email: string, password: string): Promise<LoginResult> => {
-    const res = await signIn({ username: email, password });
+    // If a session already exists, avoid calling signIn() which can throw UserAlreadyAuthenticatedException.
+    try {
+      const existing = await fetchAuthSession();
+      if (existing.tokens?.accessToken) {
+        await hydrateAuthFromCurrentSession();
+        return { status: 'SIGNED_IN' };
+      }
+    } catch {
+      // ignore
+    }
+
+    let res: unknown;
+    try {
+      res = await signIn({ username: email, password });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Common during dev when a previous session is still cached.
+      if (msg.includes('UserAlreadyAuthenticatedException')) {
+        try {
+          await signOut();
+        } catch {
+          // ignore
+        }
+        res = await signIn({ username: email, password });
+      } else {
+        throw e;
+      }
+    }
 
     // Defensive: depending on Amplify/Auth versions, `signIn` may return different shapes.
     // If we don't see the expected output, treat this as a successful sign-in and hydrate from session.
@@ -106,12 +133,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { status: 'SIGNED_IN' };
     }
 
-    if (res.isSignedIn) {
+    if ((res as { isSignedIn: boolean }).isSignedIn) {
       await hydrateAuthFromCurrentSession();
       return { status: 'SIGNED_IN' };
     }
 
-    const step = (res.nextStep as { signInStep?: unknown } | undefined)?.signInStep;
+    const step = ((res as { nextStep?: unknown }).nextStep as { signInStep?: unknown } | undefined)
+      ?.signInStep;
     if (typeof step === 'string' && step.toUpperCase().includes('NEW_PASSWORD')) {
       return { status: 'NEW_PASSWORD_REQUIRED' };
     }
