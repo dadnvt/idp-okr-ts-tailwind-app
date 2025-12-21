@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { signUp, confirmSignUp } from '@aws-amplify/auth';
+import { signUp, confirmSignUp, signOut } from '@aws-amplify/auth';
 import { Button } from './Button';
 import { apiFetch } from '../common/api';
 
@@ -47,6 +47,14 @@ export default function SignUpModal({
         alert('Vui lòng chọn team');
         return;
       }
+
+      // Avoid UserAlreadyAuthenticatedException when a session already exists.
+      try {
+        await signOut();
+      } catch {
+        // ignore
+      }
+
       const { nextStep } = await signUp({
         username: email,
         password,

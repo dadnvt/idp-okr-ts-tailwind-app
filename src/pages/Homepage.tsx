@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../common/AuthContext';
-import { signUp, confirmSignUp } from '@aws-amplify/auth';
+import { signUp, confirmSignUp, signOut } from '@aws-amplify/auth';
 import illustration from '../assets/illustration.svg';
 import { Button } from '../components/Button';
 import { apiFetch } from '../common/api';
@@ -53,6 +53,15 @@ export default function Homepage() {
         alert('Vui lòng chọn team');
         return;
       }
+
+      // If user is already signed in, Amplify will throw UserAlreadyAuthenticatedException on signUp.
+      // We silently sign out to make signup flow robust (common when testing with the same browser).
+      try {
+        await signOut();
+      } catch {
+        // ignore
+      }
+
       const { nextStep } = await signUp({
         username: email,
         password,
