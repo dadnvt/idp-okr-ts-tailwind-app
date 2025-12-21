@@ -11,6 +11,7 @@ import type { AuthState } from '../types/AuthState';
 import { apiFetch } from './api';
 
 type Role = 'member' | 'leader' | 'manager';
+type LoginResult = { status: 'SIGNED_IN' } | { status: 'NEW_PASSWORD_REQUIRED' };
 
 function getGroupList(groups: unknown): string[] {
   return Array.isArray(groups) ? (groups as string[]) : typeof groups === 'string' ? [groups] : [];
@@ -29,7 +30,7 @@ interface AuthContextType {
   login: (
     email: string,
     password: string
-  ) => Promise<{ status: 'SIGNED_IN' } | { status: 'NEW_PASSWORD_REQUIRED' }>;
+  ) => Promise<LoginResult>;
   completeNewPassword: (newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -95,8 +96,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 
   // LOGIN
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<LoginResult> => {
     const res = await signIn({ username: email, password });
+
+    // Defensive: depending on Amplify/Auth versions, `signIn` may return different shapes.
+    // If we don't see the expected output, treat this as a successful sign-in and hydrate from session.
+    if (!res || typeof (res as { isSignedIn?: unknown }).isSignedIn !== 'boolean') {
+      await hydrateAuthFromCurrentSession();
+      return { status: 'SIGNED_IN' };
+    }
+
     if (res.isSignedIn) {
       await hydrateAuthFromCurrentSession();
       return { status: 'SIGNED_IN' };
