@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../common/AuthContext';
-import { signUp, confirmSignUp, signOut } from '@aws-amplify/auth';
+import {
+  signUp,
+  confirmSignUp,
+  signOut,
+  resetPassword,
+  confirmResetPassword,
+} from '@aws-amplify/auth';
 import illustration from '../assets/illustration.svg';
 import { Button } from '../components/Button';
 import { apiFetch } from '../common/api';
@@ -8,10 +14,13 @@ import { apiFetch } from '../common/api';
 type Team = { id: string; name: string };
 
 export default function Homepage() {
-  const { login } = useAuth();
-  const [mode, setMode] = useState<'login' | 'signup' | 'confirm'>('login');
+  const { login, completeNewPassword } = useAuth();
+  const [mode, setMode] = useState<
+    'login' | 'signup' | 'confirm' | 'newPassword' | 'forgot' | 'forgotConfirm'
+  >('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [code, setCode] = useState('');
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamId, setTeamId] = useState('');
@@ -39,10 +48,28 @@ export default function Homepage() {
   // Đăng nhập
   const handleLogin = async () => {
     try {
-      await login(email, password);
+      const res = await login(email, password);
+      if (res.status === 'NEW_PASSWORD_REQUIRED') {
+        setMode('newPassword');
+      }
     } catch (err) {
       console.error('Login error:', err);
       alert('Đăng nhập thất bại');
+    }
+  };
+
+  const handleCompleteNewPassword = async () => {
+    try {
+      if (!newPassword || newPassword.length < 8) {
+        alert('Mật khẩu mới phải tối thiểu 8 ký tự');
+        return;
+      }
+      await completeNewPassword(newPassword);
+      setNewPassword('');
+      alert('Đổi mật khẩu thành công');
+    } catch (err) {
+      console.error('Complete new password error:', err);
+      alert('Đổi mật khẩu thất bại');
     }
   };
 
@@ -90,6 +117,50 @@ export default function Homepage() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    try {
+      if (!email) {
+        alert('Vui lòng nhập email');
+        return;
+      }
+      await resetPassword({ username: email });
+      setMode('forgotConfirm');
+      alert('Đã gửi mã xác nhận về email (nếu email tồn tại)');
+    } catch (err) {
+      console.error('Forgot password error:', err);
+      alert('Gửi mã thất bại');
+    }
+  };
+
+  const handleForgotConfirm = async () => {
+    try {
+      if (!email) {
+        alert('Vui lòng nhập email');
+        return;
+      }
+      if (!code) {
+        alert('Vui lòng nhập mã xác nhận');
+        return;
+      }
+      if (!newPassword || newPassword.length < 8) {
+        alert('Mật khẩu mới phải tối thiểu 8 ký tự');
+        return;
+      }
+      await confirmResetPassword({
+        username: email,
+        confirmationCode: code,
+        newPassword,
+      });
+      setCode('');
+      setNewPassword('');
+      alert('Reset mật khẩu thành công. Bạn có thể đăng nhập!');
+      setMode('login');
+    } catch (err) {
+      console.error('Forgot confirm error:', err);
+      alert('Reset mật khẩu thất bại');
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-gray-50">
       {/* Left illustration */}
@@ -127,8 +198,87 @@ export default function Homepage() {
                 <Button onClick={handleLogin} fullWidth variant="primary">
                   Login Now
                 </Button>
+                <Button onClick={() => setMode('forgot')} fullWidth variant="secondary">
+                  Forgot Password
+                </Button>
                 <Button onClick={() => setMode('signup')} fullWidth variant="secondary">
                   Create Account
+                </Button>
+              </div>
+            </>
+          )}
+
+          {mode === 'newPassword' && (
+            <>
+              <h2 className="text-2xl font-bold mb-6 text-center">Set New Password</h2>
+              <p className="text-sm text-gray-600 mb-3">
+                Tài khoản của bạn đang dùng mật khẩu tạm. Vui lòng đặt mật khẩu mới để tiếp tục.
+              </p>
+              <div className="space-y-4">
+                <input
+                  type="password"
+                  placeholder="New Password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand focus:outline-none"
+                />
+                <Button onClick={handleCompleteNewPassword} fullWidth variant="primary">
+                  Update Password
+                </Button>
+                <Button onClick={() => setMode('login')} fullWidth variant="secondary">
+                  Back to Login
+                </Button>
+              </div>
+            </>
+          )}
+
+          {mode === 'forgot' && (
+            <>
+              <h2 className="text-2xl font-bold mb-6 text-center">Forgot Password</h2>
+              <div className="space-y-4">
+                <input
+                  type="email"
+                  placeholder="Email Address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand focus:outline-none"
+                />
+                <Button onClick={handleForgotPassword} fullWidth variant="primary">
+                  Send Code
+                </Button>
+                <Button onClick={() => setMode('login')} fullWidth variant="secondary">
+                  Back to Login
+                </Button>
+              </div>
+            </>
+          )}
+
+          {mode === 'forgotConfirm' && (
+            <>
+              <h2 className="text-2xl font-bold mb-6 text-center">Reset Password</h2>
+              <p className="text-sm text-gray-600 mb-3">
+                Nhập mã xác nhận và mật khẩu mới
+              </p>
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Confirmation Code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand focus:outline-none"
+                />
+                <input
+                  type="password"
+                  placeholder="New Password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-brand focus:outline-none"
+                />
+                <Button onClick={handleForgotConfirm} fullWidth variant="primary">
+                  Reset Password
+                </Button>
+                <Button onClick={() => setMode('login')} fullWidth variant="secondary">
+                  Back to Login
                 </Button>
               </div>
             </>

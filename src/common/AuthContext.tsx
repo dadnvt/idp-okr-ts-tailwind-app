@@ -1,6 +1,12 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { signIn, signOut, fetchAuthSession, fetchUserAttributes } from '@aws-amplify/auth';
+import {
+  signIn,
+  signOut,
+  confirmSignIn,
+  fetchAuthSession,
+  fetchUserAttributes,
+} from '@aws-amplify/auth';
 import type { AuthState } from '../types/AuthState';
 import { apiFetch } from './api';
 
@@ -20,7 +26,11 @@ function deriveRoleFromGroups(groups: unknown): Role {
 interface AuthContextType {
   auth: AuthState;
   isInitializing: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string
+  ) => Promise<{ status: 'SIGNED_IN' } | { status: 'NEW_PASSWORD_REQUIRED' }>;
+  completeNewPassword: (newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -37,11 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
   const [isInitializing, setIsInitializing] = useState(true);
 
-
-  // LOGIN
-  const login = async (email: string, password: string) => {
-    await signIn({ username: email, password });
-
+  const hydrateAuthFromCurrentSession = async () => {
     const session = await fetchAuthSession();
     const attributes = await fetchUserAttributes();
     const token = session.tokens?.accessToken?.toString() || null;
@@ -58,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: attributes.name || attributes.email,
         // We use Cognito standard attribute `locale` as team code/name (per project convention).
         team: attributes.locale || null,
-        role : role
+        role: role,
       },
     });
 
@@ -87,6 +93,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+
+  // LOGIN
+  const login = async (email: string, password: string) => {
+    const res = await signIn({ username: email, password });
+    if (res.isSignedIn) {
+      await hydrateAuthFromCurrentSession();
+      return { status: 'SIGNED_IN' };
+    }
+
+    const step = (res.nextStep as { signInStep?: unknown } | undefined)?.signInStep;
+    if (typeof step === 'string' && step.toUpperCase().includes('NEW_PASSWORD')) {
+      return { status: 'NEW_PASSWORD_REQUIRED' };
+    }
+
+    throw new Error(
+      `[auth] Unsupported sign-in step: ${typeof step === 'string' ? step : 'unknown'}`
+    );
+  };
+
+  const completeNewPassword = async (newPassword: string) => {
+    await confirmSignIn({ challengeResponse: newPassword });
+    await hydrateAuthFromCurrentSession();
+  };
+
   // LOGOUT
   const logout = async () => {
     await signOut();
@@ -97,47 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const init = async () => {
       try {
-        const session = await fetchAuthSession();
-        const token = session.tokens?.accessToken?.toString() || null;
-        const groups =
-          session.tokens?.idToken?.payload['cognito:groups'] ??
-          session.tokens?.accessToken?.payload['cognito:groups'];
-        const attributes = await fetchUserAttributes();
-        const role = deriveRoleFromGroups(groups);
-
-        setAuth({
-          token: token,
-          user: {
-            id: attributes.sub,
-            email: attributes.email,
-            name: attributes.name || attributes.email,
-            team: attributes.locale || null,
-            role : role
-          },
-        });
-
-        // Ensure DB user record exists on app refresh too.
-        try {
-          const res = await apiFetch(
-            '/auth/ensure-user',
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: attributes.email ?? null,
-                name: (attributes.name || attributes.email) ?? null,
-                team: attributes.locale ?? null,
-              }),
-            },
-            token
-          );
-          if (!res.ok) {
-            const text = await res.text();
-            console.warn('[auth]', 'ensure-user failed:', res.status, text);
-          }
-        } catch (e) {
-          console.warn('[auth]', 'ensure-user network error:', e);
-        }
+        await hydrateAuthFromCurrentSession();
       } catch {
         // not logged in
       } finally {
@@ -148,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ auth, isInitializing, login, logout }}>
+    <AuthContext.Provider value={{ auth, isInitializing, login, completeNewPassword, logout }}>
       {children}
     </AuthContext.Provider>
   );
