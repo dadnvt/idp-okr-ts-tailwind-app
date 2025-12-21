@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { signIn, signOut, fetchAuthSession, fetchUserAttributes } from '@aws-amplify/auth';
 import type { AuthState } from '../types/AuthState';
+import { apiFetch } from './api';
 
 type Role = 'member' | 'leader' | 'manager';
 
@@ -60,6 +61,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role : role
       },
     });
+
+    // Ensure DB user record exists (maps Cognito user -> `users` table).
+    // Non-fatal: app can still show UI, but team/leader scopes may fail until resolved.
+    try {
+      const res = await apiFetch(
+        '/auth/ensure-user',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: attributes.email ?? null,
+            name: (attributes.name || attributes.email) ?? null,
+            team: attributes.locale ?? null,
+          }),
+        },
+        token
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        console.warn('[auth]', 'ensure-user failed:', res.status, text);
+      }
+    } catch (e) {
+      console.warn('[auth]', 'ensure-user network error:', e);
+    }
   };
 
   // LOGOUT
@@ -90,6 +115,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             role : role
           },
         });
+
+        // Ensure DB user record exists on app refresh too.
+        try {
+          const res = await apiFetch(
+            '/auth/ensure-user',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: attributes.email ?? null,
+                name: (attributes.name || attributes.email) ?? null,
+                team: attributes.locale ?? null,
+              }),
+            },
+            token
+          );
+          if (!res.ok) {
+            const text = await res.text();
+            console.warn('[auth]', 'ensure-user failed:', res.status, text);
+          }
+        } catch (e) {
+          console.warn('[auth]', 'ensure-user network error:', e);
+        }
       } catch {
         // not logged in
       } finally {

@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { signUp, confirmSignUp } from '@aws-amplify/auth';
 import { Button } from './Button';
+import { apiFetch } from '../common/api';
+
+type Team = { id: string; name: string };
 
 export default function SignUpModal({
   isOpen,
@@ -13,17 +16,44 @@ export default function SignUpModal({
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'signup' | 'confirm'>('signup');
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamId, setTeamId] = useState('');
+  const [teamsLoading, setTeamsLoading] = useState(false);
 
   if (!isOpen) return null;
 
+  useEffect(() => {
+    const load = async () => {
+      if (!isOpen) return;
+      if (teams.length > 0) return;
+      setTeamsLoading(true);
+      try {
+        const res = await apiFetch('/public/teams');
+        const json = (await res.json()) as { data?: Team[] };
+        setTeams(Array.isArray(json.data) ? json.data : []);
+      } catch (err) {
+        console.error('Load teams error:', err);
+        setTeams([]);
+      } finally {
+        setTeamsLoading(false);
+      }
+    };
+    void load();
+  }, [isOpen, teams.length]);
+
   const handleSignUp = async () => {
     try {
+      if (!teamId) {
+        alert('Vui lòng chọn team');
+        return;
+      }
       const { nextStep } = await signUp({
         username: email,
         password,
         options: {
           userAttributes: {
             email,
+            locale: teamId,
           },
         },
       });
@@ -77,6 +107,18 @@ export default function SignUpModal({
           <>
             <h2 className="text-2xl font-bold mb-4 text-center">Đăng ký</h2>
             <div className="space-y-4">
+              <select
+                value={teamId}
+                onChange={(e) => setTeamId(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand focus:outline-none bg-white"
+              >
+                <option value="">{teamsLoading ? 'Loading teams...' : 'Chọn team'}</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
               <input
                 type="email"
                 placeholder="Email"
