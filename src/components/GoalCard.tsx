@@ -76,7 +76,7 @@ export default function GoalCard({
         </p>
       )}
 
-      {goal.is_locked && (
+      {Boolean(goal.is_locked) && (
         <div className="flex items-center text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-300 px-3 py-1 rounded-full w-fit mb-3">
           {goal.review_status === 'Pending'
             ? 'Review requested (locked)'

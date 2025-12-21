@@ -415,7 +415,7 @@ export default function MemberDashboard() {
                   </div>
                 )}
 
-                {selectedGoal.review_status === 'Pending' && selectedGoal.is_locked && (
+                {selectedGoal.review_status === 'Pending' && Boolean(selectedGoal.is_locked) && (
                   <div className="pt-3">
                     <Button
                       variant="secondary"

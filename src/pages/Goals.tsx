@@ -510,7 +510,7 @@ export default function GoalsPage() {
                 </div>
               )}
 
-              {detailGoal.review_status === 'Pending' && detailGoal.is_locked && (
+              {detailGoal.review_status === 'Pending' && Boolean(detailGoal.is_locked) && (
                 <div className="pt-3">
                   <Button
                     variant="secondary"

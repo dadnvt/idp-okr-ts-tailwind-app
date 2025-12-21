@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Dropdown from '../Dropdown';
 import { InfoLabel } from '../Tooltip';
 import { useAuth } from '../../common/AuthContext';
+import { Button } from '../Button';
+import { FaSignOutAlt } from 'react-icons/fa';
 import {
   fetchManagerMemberInsights,
   fetchManagerOverview,
@@ -23,7 +25,7 @@ function currentYear() {
 }
 
 export default function ManagerDashboard() {
-  const { auth } = useAuth();
+  const { auth, logout } = useAuth();
 
   const [year, setYear] = useState(String(currentYear()));
   const [teams, setTeams] = useState<ManagerTeam[]>([]);
@@ -199,7 +201,19 @@ export default function ManagerDashboard() {
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-800">Manager Dashboard</h1>
-          {loading ? <div className="text-sm text-gray-500">Loading…</div> : null}
+          <div className="flex items-center gap-3">
+            {loading ? <div className="text-sm text-gray-500">Loading…</div> : null}
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => void logout()}
+              className="flex items-center"
+              title="Logout"
+            >
+              <FaSignOutAlt className="mr-2 w-4 h-4" />
+              Logout
+            </Button>
+          </div>
         </div>
 
         <div className="mt-4 p-4 bg-white rounded-xl border">

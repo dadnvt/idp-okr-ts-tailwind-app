@@ -314,7 +314,7 @@ export default function ActionPlansPage() {
 
                 {/* Goal Status */}
                 <div className="mb-4">
-                  {goal.is_locked && (
+                  {Boolean(goal.is_locked) && (
                     <div className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-300 px-3 py-1 rounded-full w-fit mb-2">
                       {goal.review_status === 'Pending'
                         ? 'Review requested (locked)'
@@ -425,7 +425,7 @@ export default function ActionPlansPage() {
                     </div>
                   </div>
 
-                  {selectedPlan.review_status === 'Pending' && selectedPlan.is_locked && (
+                  {selectedPlan.review_status === 'Pending' && Boolean(selectedPlan.is_locked) && (
                     <p className="text-sm text-gray-500 italic">
                       Pending review: Allow edit deadline only. Status will locked until leader review.
                     </p>
@@ -529,7 +529,7 @@ export default function ActionPlansPage() {
 
               {auth.user?.role !== 'leader' && (
                 <div className="space-y-2">
-                  {selectedPlan.review_status === 'Pending' && selectedPlan.is_locked && (
+                  {selectedPlan.review_status === 'Pending' && Boolean(selectedPlan.is_locked) && (
                     <Button
                       onClick={async () => {
                         const { res, result } = await cancelActionPlanReview(auth.token, selectedPlan.id);
